@@ -88,6 +88,9 @@ func main() {
 
 	hero := &entity{xp: 50, yp: 50, maxV: 100}
 	hero.setSprite(&sdl.Rect{16 * 1, 16 * 0, 16, 16}, tileset)
+	hero.collider = &sdl.Rect{hero.xp, hero.yp, 16, 16}
+
+	wall := &sdl.Rect{128, 64, 32, 256}
 
 	started := time.Now()
 	var quit bool
@@ -106,25 +109,25 @@ func main() {
 				}
 				if e.Type == sdl.KEYDOWN && e.Repeat == 0 {
 					switch e.Keysym.Sym {
-					case sdl.K_UP:
+					case sdl.K_w:
 						hero.yv -= hero.maxV
-					case sdl.K_DOWN:
+					case sdl.K_s:
 						hero.yv += hero.maxV
-					case sdl.K_LEFT:
+					case sdl.K_a:
 						hero.xv -= hero.maxV
-					case sdl.K_RIGHT:
+					case sdl.K_d:
 						hero.xv += hero.maxV
 					}
 				}
 				if e.Type == sdl.KEYUP && e.Repeat == 0 {
 					switch e.Keysym.Sym {
-					case sdl.K_UP:
+					case sdl.K_w:
 						hero.yv += hero.maxV
-					case sdl.K_DOWN:
+					case sdl.K_s:
 						hero.yv -= hero.maxV
-					case sdl.K_LEFT:
+					case sdl.K_a:
 						hero.xv += hero.maxV
-					case sdl.K_RIGHT:
+					case sdl.K_d:
 						hero.xv -= hero.maxV
 					}
 				}
@@ -133,12 +136,13 @@ func main() {
 			}
 		}
 		// update the world
-		hero.move(dt)
+		hero.move(dt, wall)
 
-		// draw the world
+		// draw the bg
 		renderer.SetDrawColor(128, 128, 128, 0xFF)
 		renderer.Clear()
 
+		// draw grass
 		for x := int32(0); int(x) < len(w); x++ {
 			for y := int32(0); int(y) < len(w[x]); y++ {
 				c := w[x][y]
@@ -149,6 +153,7 @@ func main() {
 		}
 
 		hero.render()
+		renderer.DrawRect(wall)
 
 		// fps
 		fpsText := TextureFromText(renderer, font, fmt.Sprint(int(dt*1000)), yellow)
@@ -161,11 +166,12 @@ func main() {
 }
 
 type entity struct {
-	xp, yp int32 // position in the world
-	xv, yv int32 // velocity per axis
-	maxV   int32
-	sprite *sdl.Rect
-	tex    *Texture
+	xp, yp   int32 // position in the world
+	xv, yv   int32 // velocity per axis
+	maxV     int32
+	sprite   *sdl.Rect
+	tex      *Texture
+	collider *sdl.Rect
 }
 
 func (e *entity) setSprite(s *sdl.Rect, t *Texture) {
@@ -173,9 +179,21 @@ func (e *entity) setSprite(s *sdl.Rect, t *Texture) {
 	e.tex = t
 }
 
-func (e *entity) move(dt float64) {
-	e.xp = e.xp + int32(float64(e.xv)*dt)
-	e.yp = e.yp + int32(float64(e.yv)*dt)
+func (e *entity) move(dt float64, wall *sdl.Rect) {
+	xdelta := int32(float64(e.xv) * dt)
+	e.xp += xdelta
+	e.collider.X = e.xp
+	if e.xp < 0 || e.xp+16 > width || collides(e.collider, wall) {
+		e.xp -= xdelta
+		e.collider.X = e.xp
+	}
+	ydelta := int32(float64(e.yv) * dt)
+	e.yp += ydelta
+	e.collider.Y = e.yp
+	if e.yp < 0 || e.yp+16 > height || collides(e.collider, wall) {
+		e.yp -= ydelta
+		e.collider.Y = e.yp
+	}
 }
 
 func (e *entity) render() {
@@ -194,6 +212,24 @@ type Texture struct {
 	Width, Height int32
 	T             *sdl.Texture
 	R             *sdl.Renderer
+}
+
+func collides(a, b *sdl.Rect) bool {
+	aLeft := a.X
+	aRight := a.X + a.W
+	aTop := a.Y
+	aBottom := a.Y + a.H
+	bLeft := b.X
+	bRight := b.X + b.W
+	bTop := b.Y
+	bBottom := b.Y + b.H
+	if aBottom <= bTop || bBottom <= aTop {
+		return false
+	}
+	if aRight <= bLeft || bRight <= aLeft {
+		return false
+	}
+	return true
 }
 
 func TextureFromFile(r *sdl.Renderer, filename string) *Texture {
