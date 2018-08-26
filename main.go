@@ -1,269 +1,253 @@
 package main
 
 import (
-	"flag"
 	"fmt"
-	"log"
-	"math/rand"
+	"image"
+	"math"
 	"os"
-	"runtime/pprof"
 	"time"
 
-	"github.com/veandco/go-sdl2/img"
-	"github.com/veandco/go-sdl2/sdl"
-	"github.com/veandco/go-sdl2/ttf"
+	"image/color"
+	_ "image/png"
+
+	"github.com/faiface/pixel"
+	"github.com/faiface/pixel/imdraw"
+	"github.com/faiface/pixel/pixelgl"
+	"golang.org/x/image/colornames"
 )
 
-var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+func loadPicture(path string) (pixel.Picture, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	img, _, err := image.Decode(file)
+	if err != nil {
+		return nil, err
+	}
+	return pixel.PictureDataFromImage(img), nil
+}
 
-var width int32 = 800
-var height int32 = 600
+type Camera struct {
+	Window          *pixelgl.Window
+	Pos             pixel.Vec
+	Speed           float64
+	Zoom, ZoomSpeed float64
+}
+
+func NewCamera(win *pixelgl.Window) *Camera {
+	return &Camera{win, pixel.ZV, 500.0, 2.0, 1.1}
+}
+
+func (c *Camera) GetMatrix() pixel.Matrix {
+	return pixel.IM.Scaled(c.Pos, c.Zoom).Moved(c.Window.Bounds().Center().Sub(c.Pos))
+}
+
+func (c *Camera) Update(dt float64) {
+	// if c.Window.Pressed(pixelgl.KeyA) {
+	// 	c.Pos.X -= c.Speed * dt * (1.0 / c.Zoom)
+	// }
+	// if c.Window.Pressed(pixelgl.KeyD) {
+	// 	c.Pos.X += c.Speed * dt * (1.0 / c.Zoom)
+	// }
+	// if c.Window.Pressed(pixelgl.KeyW) {
+	// 	c.Pos.Y -= c.Speed * dt * (1.0 / c.Zoom)
+	// }
+	// if c.Window.Pressed(pixelgl.KeyS) {
+	// 	c.Pos.Y += c.Speed * dt * (1.0 / c.Zoom)
+	// }
+	c.Zoom *= math.Pow(c.ZoomSpeed, c.Window.MouseScroll().Y)
+}
+
+type Entity struct {
+	s        *pixel.Sprite
+	mat      pixel.Matrix
+	collider pixel.Rect
+	color    color.Color
+	vel      pixel.Vec
+	maxVel   float64
+	limitVel float64
+	accel    float64
+}
+
+func NewEntity(s *pixel.Sprite, scale float64, pos pixel.Vec, collider pixel.Rect, color color.Color, maxVel, limitVel, accel float64) *Entity {
+	mat := pixel.IM.Scaled(pixel.ZV, scale).Moved(pos)
+	collider = collider.Moved(pos)
+	return &Entity{
+		s:        s,
+		mat:      mat,
+		collider: collider,
+		color:    color,
+		maxVel:   maxVel,
+		limitVel: limitVel,
+		accel:    accel,
+	}
+}
+
+func (h *Entity) Update(win *pixelgl.Window, dt float64, wall pixel.Rect) {
+	// oldV := h.vel
+
+	dx := 0.0
+	if win.Pressed(pixelgl.KeyA) {
+		dx = -h.accel * dt
+	} else if win.Pressed(pixelgl.KeyD) {
+		dx = +h.accel * dt
+	} else {
+		if h.vel.X > h.limitVel {
+			dx = -h.accel * dt
+		} else if h.vel.X < -h.limitVel {
+			dx = +h.accel * dt
+		} else {
+			h.vel.X = 0
+		}
+	}
+	h.vel.X = pixel.Clamp(h.vel.X+dx, -h.maxVel, h.maxVel)
+
+	dy := 0.0
+	if win.Pressed(pixelgl.KeyS) {
+		dy = -h.accel * dt
+	} else if win.Pressed(pixelgl.KeyW) {
+		dy = +h.accel * dt
+	} else {
+		if h.vel.Y > h.limitVel {
+			dy = -h.accel * dt
+		} else if h.vel.Y < -h.limitVel {
+			dy = +h.accel * dt
+		} else {
+			h.vel.Y = 0
+		}
+	}
+	h.vel.Y = pixel.Clamp(h.vel.Y+dy, -h.maxVel, h.maxVel)
+
+	// limit diagonal speed
+	actualVel := h.vel.Len()
+	if actualVel > h.maxVel {
+		h.vel = h.vel.Scaled(h.maxVel / actualVel)
+	}
+
+	delta := h.vel.Scaled(dt)
+	c := h.collider.Moved(delta)
+	overlap := c.Intersect(wall)
+	if overlap.W() > 0 {
+		h.vel.X = 0
+		delta.X = 0
+	}
+	if overlap.H() > 0 {
+		h.vel.Y = 0
+		delta.Y = 0
+	}
+	h.collider = h.collider.Moved(delta)
+	h.mat = h.mat.Moved(delta)
+
+	// if h.vel != oldV {
+	// 	fmt.Println(h.vel)
+	// }
+}
+
+func run() {
+	// load tileset
+	tileset, err := loadPicture("tileset.png")
+	if err != nil {
+		panic(err)
+	}
+	const sDim = 16
+	var frames []pixel.Rect
+	{
+		b := tileset.Bounds()
+		for y := b.Max.Y; y > b.Min.Y; y -= sDim {
+			for x := b.Min.X; x < b.Max.X; x += sDim {
+				frames = append(frames, pixel.R(x, y-sDim, x+sDim, y))
+			}
+		}
+	}
+	fmt.Printf("%v tiles loaded\n", len(frames))
+
+	cfg := pixelgl.WindowConfig{
+		Title:  "A World",
+		Bounds: pixel.R(0, 0, 1000, 600),
+		VSync:  false,
+	}
+	win, err := pixelgl.NewWindow(cfg)
+	if err != nil {
+		panic(err)
+	}
+	win.SetSmooth(false)
+
+	// fps
+	last := time.Now()
+	elapsedFrames := 0
+	everySecond := time.Tick(time.Second)
+
+	camera := NewCamera(win)
+
+	spr := pixel.NewSprite(tileset, frames[2])
+	hero := NewEntity(
+		spr,
+		1.0,
+		pixel.V(-100, -100),
+		pixel.R(-spr.Frame().W()/2, -spr.Frame().H()/2, spr.Frame().W()/2, spr.Frame().H()/2),
+		colornames.White, 50, 1, 300,
+	)
+
+	wall := pixel.R(0, 0, 100, 100)
+
+	trid := &pixel.TrianglesData{}
+	batch := pixel.NewBatch(trid, tileset)
+	imd := imdraw.New(nil)
+
+	for !win.Closed() {
+		dt := time.Since(last).Seconds()
+		last = time.Now()
+
+		camMat := camera.GetMatrix()
+		win.SetMatrix(camMat)
+		camera.Update(dt)
+
+		hero.Update(win, dt, wall)
+
+		wPos := camMat.Unproject(win.MousePosition())
+
+		win.Clear(colornames.Forestgreen)
+
+		// debug
+		imd.Clear()
+		imd.Color = colornames.Blueviolet
+		drawRect(imd, hero.collider)
+		drawRect(imd, wall)
+
+		origin := hero.mat.Project(pixel.ZV)
+		target := origin.Add(wPos.Sub(origin).Unit().Scaled(16))
+		fmt.Println(origin, target)
+		imd.Push(origin, target)
+		imd.Line(1)
+
+		imd.Draw(win)
+
+		batch.Clear()
+		hero.s.DrawColorMask(batch, hero.mat, hero.color)
+		batch.Draw(win)
+		win.Update()
+
+		elapsedFrames++
+		select {
+		case <-everySecond:
+			win.SetTitle(fmt.Sprintf("%s | fps: %d", cfg.Title, elapsedFrames))
+			elapsedFrames = 0
+		default:
+		}
+	}
+}
 
 func main() {
-	flag.Parse()
-	if *cpuprofile != "" {
-		f, err := os.Create(*cpuprofile)
-		if err != nil {
-			log.Fatal(err)
-		}
-		pprof.StartCPUProfile(f)
-		defer pprof.StopCPUProfile()
-	}
-
-	if err := sdl.Init(sdl.INIT_EVERYTHING); err != nil {
-		log.Fatalf("Failed to init SDL: %v", err)
-	}
-	defer sdl.Quit()
-
-	if err := ttf.Init(); err != nil {
-		log.Fatalf("Failed to init TTF: %v", err)
-	}
-	defer ttf.Quit()
-
-	window, err := sdl.CreateWindow("SDL from Go", sdl.WINDOWPOS_CENTERED, sdl.WINDOWPOS_CENTERED, width, height, sdl.WINDOW_SHOWN)
-	if err != nil {
-		log.Fatalf("Failed to create window: %v", err)
-	}
-	defer window.Destroy()
-
-	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_ACCELERATED|sdl.RENDERER_PRESENTVSYNC)
-	if err != nil {
-		log.Fatalf("Failed to get renderer: %v", err)
-	}
-	defer renderer.Destroy()
-	if rInfo, err := renderer.GetInfo(); err == nil {
-		log.Printf("Renderer: %v, Max texture: %v x %v", rInfo.Name, rInfo.RendererInfoData.MaxTextureWidth, rInfo.RendererInfoData.MaxTextureHeight)
-	}
-
-	if rw, rh, err := renderer.GetOutputSize(); err == nil {
-		// Support for Retina displays. Override width and height values with
-		// dimensions in pixels. These are dimensions where we can draw.
-		log.Printf("Drawable dimensions: %v x %v", rw, rh)
-		width = rw
-		height = rh
-	}
-
-	font, err := ttf.OpenFont("lazy.ttf", 28)
-	if err != nil {
-		log.Fatalf("Cannot load font: %v", err)
-	}
-
-	tileset := TextureFromFile(renderer, "tileset.png")
-	defer tileset.T.Destroy()
-	tileset.T.SetColorMod(0xee, 0xee, 0xee)
-	//tileset.T.SetColorMod(255, 255, 255)
-
-	yellow := sdl.Color{0xff, 0xff, 0, 0xff}
-
-	wSize := 32
-	w := make([][]cell, wSize)
-	for i := 0; i < wSize; i++ {
-		w[i] = make([]cell, wSize)
-		for j := 0; j < wSize; j++ {
-			w[i][j].bg.R = uint8(rand.Intn(16))
-			w[i][j].bg.G = uint8(rand.Intn(64) + 64)
-			w[i][j].bg.A = 255
-		}
-	}
-
-	hero := &entity{xp: 50, yp: 50, maxV: 100}
-	hero.setSprite(&sdl.Rect{16 * 1, 16 * 0, 16, 16}, tileset)
-	hero.collider = &sdl.Rect{hero.xp, hero.yp, 16, 16}
-
-	wall := &sdl.Rect{128, 64, 32, 256}
-
-	started := time.Now()
-	var quit bool
-	for !quit {
-		dt := time.Since(started).Seconds()
-		started = time.Now()
-		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-			switch e := event.(type) {
-			case *sdl.QuitEvent:
-				quit = true
-			case *sdl.KeyboardEvent:
-				switch e.Keysym.Sym {
-				case sdl.K_ESCAPE:
-					quit = true
-					continue
-				}
-				if e.Type == sdl.KEYDOWN && e.Repeat == 0 {
-					switch e.Keysym.Sym {
-					case sdl.K_w:
-						hero.yv -= hero.maxV
-					case sdl.K_s:
-						hero.yv += hero.maxV
-					case sdl.K_a:
-						hero.xv -= hero.maxV
-					case sdl.K_d:
-						hero.xv += hero.maxV
-					}
-				}
-				if e.Type == sdl.KEYUP && e.Repeat == 0 {
-					switch e.Keysym.Sym {
-					case sdl.K_w:
-						hero.yv += hero.maxV
-					case sdl.K_s:
-						hero.yv -= hero.maxV
-					case sdl.K_a:
-						hero.xv += hero.maxV
-					case sdl.K_d:
-						hero.xv -= hero.maxV
-					}
-				}
-				// fmt.Printf("%v\n", e)
-				// fmt.Println(hero)
-			}
-		}
-		// update the world
-		hero.move(dt, wall)
-
-		// draw the bg
-		renderer.SetDrawColor(128, 128, 128, 0xFF)
-		renderer.Clear()
-
-		// draw grass
-		for x := int32(0); int(x) < len(w); x++ {
-			for y := int32(0); int(y) < len(w[x]); y++ {
-				c := w[x][y]
-				renderer.SetDrawColor(c.bg.R, c.bg.G, c.bg.B, c.bg.A)
-				renderer.FillRect(&sdl.Rect{x * 16, y * 16, 16, 16})
-				//tileset.Render(x*16, y*16, &sdl.Rect{(x % 16) * 16, (y % 16) * 16, 16, 16})
-			}
-		}
-
-		hero.render()
-		renderer.DrawRect(wall)
-
-		// fps
-		fpsText := TextureFromText(renderer, font, fmt.Sprint(int(dt*1000)), yellow)
-		fpsText.Render(width-50, height-35, nil)
-
-		renderer.SetDrawColor(0xff, 0xff, 0xff, 0xFF)
-		renderer.DrawLine(width-10, height, width-10, height-int32(dt*1000))
-		renderer.Present()
-	}
+	pixelgl.Run(run)
 }
 
-type entity struct {
-	xp, yp   int32 // position in the world
-	xv, yv   int32 // velocity per axis
-	maxV     int32
-	sprite   *sdl.Rect
-	tex      *Texture
-	collider *sdl.Rect
-}
-
-func (e *entity) setSprite(s *sdl.Rect, t *Texture) {
-	e.sprite = s
-	e.tex = t
-}
-
-func (e *entity) move(dt float64, wall *sdl.Rect) {
-	xdelta := int32(float64(e.xv) * dt)
-	e.xp += xdelta
-	e.collider.X = e.xp
-	if e.xp < 0 || e.xp+16 > width || collides(e.collider, wall) {
-		e.xp -= xdelta
-		e.collider.X = e.xp
-	}
-	ydelta := int32(float64(e.yv) * dt)
-	e.yp += ydelta
-	e.collider.Y = e.yp
-	if e.yp < 0 || e.yp+16 > height || collides(e.collider, wall) {
-		e.yp -= ydelta
-		e.collider.Y = e.yp
-	}
-}
-
-func (e *entity) render() {
-	xr := (e.xp + 8) / 16 * 16
-	yr := (e.yp + 8) / 16 * 16
-	e.tex.R.SetDrawColor(120, 120, 120, 255)
-	e.tex.R.DrawRect(&sdl.Rect{xr, yr, 16, 16})
-	e.tex.Render(e.xp, e.yp, e.sprite)
-}
-
-type cell struct {
-	bg sdl.Color
-}
-
-type Texture struct {
-	Width, Height int32
-	T             *sdl.Texture
-	R             *sdl.Renderer
-}
-
-func collides(a, b *sdl.Rect) bool {
-	aLeft := a.X
-	aRight := a.X + a.W
-	aTop := a.Y
-	aBottom := a.Y + a.H
-	bLeft := b.X
-	bRight := b.X + b.W
-	bTop := b.Y
-	bBottom := b.Y + b.H
-	if aBottom <= bTop || bBottom <= aTop {
-		return false
-	}
-	if aRight <= bLeft || bRight <= aLeft {
-		return false
-	}
-	return true
-}
-
-func TextureFromFile(r *sdl.Renderer, filename string) *Texture {
-	s, err := img.Load(filename)
-	if err != nil {
-		log.Fatalf("Cannot load image: %v", err)
-	}
-	//	s.SetColorKey(true, sdl.MapRGB(s.Format, 0, 0xFF, 0xFF)) // BG is cyan.
-	t, err := r.CreateTextureFromSurface(s)
-	if err != nil {
-		log.Fatalf("Cannot create texture: %v", err)
-	}
-	te := &Texture{Width: s.W, Height: s.H, T: t, R: r}
-	return te
-}
-
-func TextureFromText(r *sdl.Renderer, font *ttf.Font, text string, color sdl.Color) *Texture {
-	s, err := font.RenderUTF8Solid(text, color)
-	if err != nil {
-		log.Fatalf("Cannot render font: %v", err)
-	}
-	t, err := r.CreateTextureFromSurface(s)
-	if err != nil {
-		log.Fatalf("Cannot create texture: %v", err)
-	}
-	te := &Texture{Width: s.W, Height: s.H, T: t, R: r}
-	return te
-}
-
-func (t *Texture) Render(x, y int32, clip *sdl.Rect) {
-	destQuad := &sdl.Rect{X: x, Y: y, W: t.Width, H: t.Height}
-	if clip != nil {
-		destQuad.W = clip.W
-		destQuad.H = clip.H
-	}
-	t.R.Copy(t.T, clip, destQuad)
+func drawRect(imd *imdraw.IMDraw, r pixel.Rect) {
+	a := r.Min
+	b := pixel.V(r.Min.X, r.Max.Y)
+	c := r.Max
+	d := pixel.V(r.Max.X, r.Min.Y)
+	imd.Push(a, b, c, d, a)
+	imd.Line(0.5)
 }
