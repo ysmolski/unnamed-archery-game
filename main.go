@@ -44,6 +44,18 @@ func drawRect(imd *imdraw.IMDraw, r pixel.Rect) {
 	imd.Line(1)
 }
 
+func Intersects(a, b pixel.Rect) bool {
+	x1 := math.Max(a.Min.X, b.Min.X)
+	y1 := math.Max(a.Min.Y, b.Min.Y)
+	x2 := math.Min(a.Max.X, b.Max.X)
+	y2 := math.Min(a.Max.Y, b.Max.Y)
+
+	if x1 > x2 || y1 > y2 {
+		return false
+	}
+	return true
+}
+
 type Camera struct {
 	Window          *pixelgl.Window
 	Pos             pixel.Vec
@@ -101,8 +113,6 @@ func NewEntity(s *pixel.Sprite, scale float64, pos pixel.Vec, collider pixel.Rec
 }
 
 func (h *Entity) Update(win *pixelgl.Window, dt float64, walls []pixel.Rect) {
-	oldV := h.vel
-
 	dx := 0.0
 	if win.Pressed(pixelgl.KeyA) {
 		dx = -h.accel * dt
@@ -144,27 +154,33 @@ func (h *Entity) Update(win *pixelgl.Window, dt float64, walls []pixel.Rect) {
 	delta := h.vel.Scaled(dt)
 	c := h.collider.Moved(delta)
 	for _, wall := range walls {
-		overlap := c.Intersect(wall)
-		if overlap.H() > 0 {
-			h.vel.Y = 0
-			delta.Y = 0
-			c = h.collider.Moved(delta)
-			overlap = c.Intersect(wall)
-		}
-		if overlap.W() > 0 {
-			h.vel.X = 0
-			delta.X = 0
+		if Intersects(c, wall) {
+			// Try to zero movement on one of the axes and continue if there is no collision.
+			tdelta := delta
+			tdelta.Y = 0
+			c = h.collider.Moved(tdelta)
+			if !Intersects(c, wall) {
+				h.vel.Y = 0
+				delta = tdelta
+				continue
+			}
+			tdelta = delta
+			tdelta.X = 0
+			c = h.collider.Moved(tdelta)
+			if !Intersects(c, wall) {
+				h.vel.X = 0
+				delta = tdelta
+				continue
+			}
 		}
 		if delta == pixel.ZV {
+			// bail when velocity is zero
 			break
 		}
 	}
 	h.collider = h.collider.Moved(delta)
 	h.mat = h.mat.Moved(delta)
 
-	if h.vel != oldV {
-		fmt.Println(h.vel)
-	}
 }
 
 type CellType uint8
@@ -319,6 +335,7 @@ func run() {
 		// 	float64(d*w.gridSize),
 		// )
 		fmt.Fprintf(mPosTxt, "\ngrid: %v %v %v %v", a, b, c, d)
+		fmt.Fprintf(mPosTxt, "\nhvel: %6.3f %6.3f", hero.vel.X, hero.vel.Y)
 
 		//
 		// draw
