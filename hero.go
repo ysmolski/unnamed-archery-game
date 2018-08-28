@@ -7,81 +7,81 @@ import (
 
 type Hero struct {
 	Entity
-	vel      pixel.Vec
+	velocity pixel.Vec
 	maxVel   float64
-	limitVel float64
 	accel    float64
 }
 
-func NewHero(s *pixel.Sprite, pos pixel.Vec, maxVel, limitVel, accel float64) *Hero {
+func NewHero(s *pixel.Sprite, pos pixel.Vec, maxVel, accel float64) *Hero {
 	e := NewEntity(s, pos)
 	return &Hero{
-		Entity:   *e,
-		maxVel:   maxVel,
-		limitVel: limitVel,
-		accel:    accel,
+		Entity: *e,
+		maxVel: maxVel,
+		accel:  accel,
 	}
 }
 
 func (h *Hero) Update(walls []pixel.Rect) {
+	daccel := h.accel * engine.dt
+
 	dx := 0.0
 	if engine.win.Pressed(pixelgl.KeyA) {
-		dx = -h.accel * engine.dt
+		dx = -daccel
 	} else if engine.win.Pressed(pixelgl.KeyD) {
-		dx = +h.accel * engine.dt
+		dx = +daccel
 	} else {
 		// TODO: handle deceleration correctly, don't let it oscilate around 0.
-		if h.vel.X > h.limitVel {
-			dx = -h.accel * engine.dt
-		} else if h.vel.X < -h.limitVel {
-			dx = +h.accel * engine.dt
+		if h.velocity.X >= daccel {
+			dx = -daccel
+		} else if h.velocity.X <= -daccel {
+			dx = +daccel
 		} else {
-			h.vel.X = 0
+			h.velocity.X = 0
 		}
 	}
-	h.vel.X = pixel.Clamp(h.vel.X+dx, -h.maxVel, h.maxVel)
+	h.velocity.X = pixel.Clamp(h.velocity.X+dx, -h.maxVel, h.maxVel)
 
 	dy := 0.0
 	if engine.win.Pressed(pixelgl.KeyS) {
-		dy = -h.accel * engine.dt
+		dy = -daccel
 	} else if engine.win.Pressed(pixelgl.KeyW) {
-		dy = +h.accel * engine.dt
+		dy = +daccel
 	} else {
-		if h.vel.Y > h.limitVel {
-			dy = -h.accel * engine.dt
-		} else if h.vel.Y < -h.limitVel {
-			dy = +h.accel * engine.dt
+		if h.velocity.Y >= daccel {
+			dy = -daccel
+		} else if h.velocity.Y <= -daccel {
+			dy = +daccel
 		} else {
-			h.vel.Y = 0
+			h.velocity.Y = 0
 		}
 	}
-	h.vel.Y = pixel.Clamp(h.vel.Y+dy, -h.maxVel, h.maxVel)
+	h.velocity.Y = pixel.Clamp(h.velocity.Y+dy, -h.maxVel, h.maxVel)
 
 	// limit diagonal speed
-	actualVel := h.vel.Len()
+	actualVel := h.velocity.Len()
 	if actualVel > h.maxVel {
-		h.vel = h.vel.Scaled(h.maxVel / actualVel)
+		h.velocity = h.velocity.Scaled(h.maxVel / actualVel)
 	}
 
-	delta := h.vel.Scaled(engine.dt)
+	delta := h.velocity.Scaled(engine.dt)
 	colWorld := h.AbsCollider()
 	c := colWorld.Moved(delta)
 	for _, wall := range walls {
-		if Intersects(c, wall) {
+		if Collides(c, wall) {
 			// Try to zero movement on one of the axes and continue if there is no collision.
 			tdelta := delta
 			tdelta.Y = 0
 			c = colWorld.Moved(tdelta)
-			if !Intersects(c, wall) {
-				h.vel.Y = 0
+			if !Collides(c, wall) {
+				h.velocity.Y = 0
 				delta = tdelta
 				continue
 			}
 			tdelta = delta
 			tdelta.X = 0
 			c = colWorld.Moved(tdelta)
-			if !Intersects(c, wall) {
-				h.vel.X = 0
+			if !Collides(c, wall) {
+				h.velocity.X = 0
 				delta = tdelta
 				continue
 			}

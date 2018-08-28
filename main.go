@@ -43,7 +43,7 @@ func drawRect(imd *imdraw.IMDraw, r pixel.Rect) {
 	imd.Line(1)
 }
 
-func Intersects(a, b pixel.Rect) bool {
+func Collides(a, b pixel.Rect) bool {
 	x1 := math.Max(a.Min.X, b.Min.X)
 	y1 := math.Max(a.Min.Y, b.Min.Y)
 	x2 := math.Min(a.Max.X, b.Max.X)
@@ -105,7 +105,8 @@ func run() {
 	hero := NewHero(
 		spr,
 		pixel.V(16, 16),
-		100, 100/30, 800,
+		100,
+		800,
 	)
 	r := pixel.R(-spr.Frame().W()/2.5, -spr.Frame().H()/2.5, spr.Frame().W()/2.5, spr.Frame().H()/3)
 	hero.Collider = &r
@@ -146,7 +147,6 @@ func run() {
 		if arrow != nil {
 			distance := arrow.Pos.Sub(arrow.target).Len()
 			arrow.Pos = arrow.Pos.Add(arrow.vel.Scaled(engine.dt))
-			arrow.Color = colornames.Brown
 			//size := (ar.distance - math.Abs(distance-ar.distance)) / ar.distance
 			//ar.Scale = 0.5 + size*size
 
@@ -158,7 +158,7 @@ func run() {
 				destroyed = true
 			}
 			for _, wall := range walls {
-				if Intersects(acol, wall) {
+				if Collides(acol, wall) {
 					destroyed = true
 					break
 				}
@@ -166,7 +166,6 @@ func run() {
 			if destroyed {
 				arrow = nil
 			}
-
 		}
 
 		if win.JustPressed(pixelgl.MouseButton1) && arrow == nil {
@@ -174,6 +173,7 @@ func run() {
 			arrow.Pos = arrow.Pos.Add(gunDir.Scaled(12))
 			arrow.Scale = 0.7
 			arrow.Angle = gunDir.Angle()
+			arrow.Color = colornames.Brown
 			arrow.vel = gunDir.Scaled(200)
 			arrow.target = mousePos
 			arrow.distance = arrow.Pos.Sub(arrow.target).Len() / 2
@@ -186,7 +186,7 @@ func run() {
 		mPosTxt.Clear()
 		fmt.Fprintf(mPosTxt, "mpos: %6.3f %6.3f\n", mousePos.X, mousePos.Y)
 		fmt.Fprintf(mPosTxt, "hpos: %6.3f %6.3f\n", hero.Pos.X, hero.Pos.Y)
-		fmt.Fprintf(mPosTxt, "hvel: %6.3f %6.3f\n", hero.vel.X, hero.vel.Y)
+		fmt.Fprintf(mPosTxt, "hvel: %6.3f %6.3f %6.3f\n", hero.velocity.X, hero.velocity.Y, hero.velocity.Len())
 
 		//
 		// draw
