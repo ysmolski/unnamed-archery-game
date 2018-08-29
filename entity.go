@@ -12,7 +12,7 @@ type Entity struct {
 	Pos      pixel.Vec
 	Scale    float64
 	Angle    float64
-	Color    color.Color
+	Color    color.RGBA
 	Collider *pixel.Rect
 	Active   bool // whether it should be updated
 	Visible  bool // whether it should be drawn
@@ -40,4 +40,14 @@ func (e *Entity) Draw(t pixel.Target) {
 		m := pixel.IM.Scaled(pixel.ZV, e.Scale).Rotated(pixel.ZV, e.Angle).Moved(e.Pos)
 		e.Sprite.DrawColorMask(t, m, e.Color)
 	}
+}
+
+func (e *Entity) Deactivate() {
+	e.Active = false
+	e.Visible = false
+}
+
+func (e *Entity) Activate() {
+	e.Active = true
+	e.Visible = true
 }

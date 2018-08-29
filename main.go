@@ -11,6 +11,7 @@ import (
 	"runtime/pprof"
 	"time"
 
+	"image/color"
 	_ "image/png"
 
 	"github.com/faiface/pixel"
@@ -57,32 +58,40 @@ func Collides(a, b pixel.Rect) bool {
 
 type Arrow struct {
 	Entity
-	vel      pixel.Vec // velocity of the arrow
-	target   pixel.Vec // where the arrow should drop down
-	distance float64   // half the distance from original spawn point to the target
+	vel            pixel.Vec // velocity of the arrow
+	target         pixel.Vec // where the arrow should drop down
+	distance       float64   // half the distance from original spawn point to the target
+	killSpotRadius float64
 }
 
 func NewArrow(spr *pixel.Sprite) *Arrow {
 	a := &Arrow{Entity: *NewEntity(spr, pixel.ZV)}
+	a.Deactivate()
 	a.Scale = 0.7
 	a.Color = colornames.Brown
-	s := float64(world.gridSize / 4)
-	r := pixel.R(-s, -s, s, s)
+	r := pixel.R(-1, -1, 1, 1)
 	a.Collider = &r
-	a.Active = false
-	a.Visible = false
+	a.killSpotRadius = 6
 	return a
+}
+
+func (a *Arrow) DistanceToTarget() float64 {
+	return a.Pos.Sub(a.target).Len()
+}
+
+func (a *Arrow) CanKill() bool {
+	return a.DistanceToTarget() <= a.killSpotRadius
 }
 
 func (a *Arrow) Update() {
 	if !a.Active {
 		return
 	}
-	oldDist := a.Pos.Sub(a.target).Len()
+	oldDist := a.DistanceToTarget()
 	a.Pos = a.Pos.Add(a.vel.Scaled(engine.dt))
-	newDist := a.Pos.Sub(a.target).Len()
-	//size := (ar.distance - math.Abs(oldDist-ar.distance)) / ar.distance
-	//ar.Scale = 0.5 + size*size
+	newDist := a.DistanceToTarget()
+	size := (a.distance - math.Abs(oldDist-a.distance)) / a.distance
+	a.Scale = 0.7 + size*size
 	if newDist > oldDist {
 		a.Active = false
 		a.Visible = false
@@ -102,6 +111,11 @@ func (a *Arrow) Update() {
 var (
 	engine *Engine
 	world  *World
+)
+
+var (
+	darkblue = color.RGBA{0, 9, 26, 255}
+	darkgray = color.RGBA{100, 111, 130, 255}
 )
 
 func run() {
@@ -155,7 +169,7 @@ func run() {
 	spr := pixel.NewSprite(tileset, frames[1])
 	hero := NewHero(
 		spr,
-		pixel.V(16, 16),
+		pixel.V(200, 100),
 		100,
 		800,
 	)
@@ -171,7 +185,7 @@ func run() {
 		slimes[i] = NewSlime(sprSlime)
 	}
 	activeSlimes := 0
-	slimeTicker := time.Tick(1 * time.Second)
+	slimeTicker := time.Tick(4 * time.Second)
 
 	win := engine.win
 	for !win.Closed() {
@@ -198,14 +212,14 @@ func run() {
 			arrow.Visible = true
 			arrow.Pos = hero.Pos.Add(gunDir.Scaled(12))
 			arrow.Angle = gunDir.Angle()
-			arrow.vel = gunDir.Scaled(200)
+			arrow.vel = gunDir.Scaled(100)
 			arrow.target = mousePos
 			arrow.distance = arrow.Pos.Sub(arrow.target).Len() / 2
 		}
 
 		for i := range slimes {
 			if slimes[i].Active {
-				slimes[i].Update(hero)
+				slimes[i].Update(hero, arrow)
 			}
 		}
 
@@ -233,11 +247,12 @@ func run() {
 		fmt.Fprintf(mPosTxt, "mpos: %6.3f %6.3f\n", mousePos.X, mousePos.Y)
 		fmt.Fprintf(mPosTxt, "hpos: %6.3f %6.3f\n", hero.Pos.X, hero.Pos.Y)
 		fmt.Fprintf(mPosTxt, "hvel: %6.3f %6.3f %6.3f\n", hero.velocity.X, hero.velocity.Y, hero.velocity.Len())
+		fmt.Fprintf(mPosTxt, "health: %6.3f\n", hero.health)
 
 		//
 		// draw
-		//
-		win.Clear(colornames.Forestgreen)
+		///////////////////////////////////////////////
+		win.Clear(darkblue)
 
 		// debug
 		imd.Clear()
@@ -257,7 +272,7 @@ func run() {
 		batch.Clear()
 		hero.Draw(batch)
 		for _, m := range matWalls {
-			sprWall.DrawColorMask(batch, m, colornames.White)
+			sprWall.DrawColorMask(batch, m, darkgray)
 		}
 		if arrow != nil {
 			arrow.Draw(batch)

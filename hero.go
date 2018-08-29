@@ -3,25 +3,47 @@ package main
 import (
 	"github.com/faiface/pixel"
 	"github.com/faiface/pixel/pixelgl"
+	"golang.org/x/image/colornames"
 )
 
 type Hero struct {
 	Entity
-	velocity pixel.Vec
-	maxVel   float64
-	accel    float64
+	velocity          pixel.Vec
+	maxVel            float64
+	accel             float64
+	health, maxHealth float64
 }
 
 func NewHero(s *pixel.Sprite, pos pixel.Vec, maxVel, accel float64) *Hero {
 	e := NewEntity(s, pos)
 	return &Hero{
-		Entity: *e,
-		maxVel: maxVel,
-		accel:  accel,
+		Entity:    *e,
+		maxVel:    maxVel,
+		accel:     accel,
+		maxHealth: 100,
+		health:    100,
 	}
 }
 
+func (h *Hero) Damage(health float64) {
+	h.health += health
+}
+
 func (h *Hero) Update(walls []pixel.Rect) {
+	pct := h.health / h.maxHealth * 100
+	switch {
+	case pct >= 80:
+		h.Color = colornames.White
+	case pct >= 50:
+		h.Color = colornames.Peachpuff
+	case pct >= 25:
+		h.Color = colornames.Rosybrown
+	case pct > 15:
+		h.Color = colornames.Brown
+	case pct <= 0:
+		h.Color = colornames.Red
+	}
+
 	daccel := h.accel * engine.dt
 
 	dx := 0.0
