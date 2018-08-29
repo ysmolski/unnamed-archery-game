@@ -130,6 +130,17 @@ func run() {
 	}
 	engine = NewEngine(&cfg)
 
+	trid := &pixel.TrianglesData{}
+	batch := pixel.NewBatch(trid, tileset)
+	imd := imdraw.New(nil)
+
+	camera := NewCamera(engine.win)
+	camera.Pos = pixel.V(216, 83)
+
+	// font
+	atlas := text.NewAtlas(basicfont.Face7x13, text.ASCII)
+	mPosTxt := text.New(pixel.V(-32, -32), atlas)
+
 	world = NewWorld(28, 14, sSize)
 	sprWall := pixel.NewSprite(tileset, frames[256-37])
 	matWalls := make([]pixel.Matrix, 0, 32*16)
@@ -151,19 +162,16 @@ func run() {
 	r := pixel.R(-spr.Frame().W()/2.5, -spr.Frame().H()/2.5, spr.Frame().W()/2.5, spr.Frame().H()/3)
 	hero.Collider = &r
 
-	camera := NewCamera(engine.win)
-	camera.Pos = pixel.V(216, 83)
-
-	trid := &pixel.TrianglesData{}
-	batch := pixel.NewBatch(trid, tileset)
-	imd := imdraw.New(nil)
-
-	// font
-	atlas := text.NewAtlas(basicfont.Face7x13, text.ASCII)
-	mPosTxt := text.New(pixel.V(-32, -32), atlas)
-
 	sprArrow := pixel.NewSprite(tileset, frames[26])
 	arrow := NewArrow(sprArrow)
+
+	sprSlime := pixel.NewSprite(tileset, frames[15])
+	var slimes [100]*Slime
+	for i := range slimes {
+		slimes[i] = NewSlime(sprSlime)
+	}
+	activeSlimes := 0
+	slimeTicker := time.Tick(1 * time.Second)
 
 	win := engine.win
 	for !win.Closed() {
@@ -193,6 +201,32 @@ func run() {
 			arrow.vel = gunDir.Scaled(200)
 			arrow.target = mousePos
 			arrow.distance = arrow.Pos.Sub(arrow.target).Len() / 2
+		}
+
+		for i := range slimes {
+			if slimes[i].Active {
+				slimes[i].Update(hero)
+			}
+		}
+
+		select {
+		case <-slimeTicker:
+			// spawn new slime
+			if activeSlimes >= len(slimes) {
+				break
+			}
+			free := -1
+			for i := range slimes {
+				if !slimes[i].Active {
+					free = i
+					break
+				}
+			}
+			if free == -1 {
+				break
+			}
+			slimes[free].Spawn()
+		default:
 		}
 
 		mPosTxt.Clear()
@@ -227,6 +261,9 @@ func run() {
 		}
 		if arrow != nil {
 			arrow.Draw(batch)
+		}
+		for i := range slimes {
+			slimes[i].Draw(batch)
 		}
 		batch.Draw(win)
 
