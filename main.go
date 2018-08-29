@@ -56,58 +56,6 @@ func Collides(a, b pixel.Rect) bool {
 	return true
 }
 
-type Arrow struct {
-	Entity
-	vel            pixel.Vec // velocity of the arrow
-	target         pixel.Vec // where the arrow should drop down
-	distance       float64   // half the distance from original spawn point to the target
-	killSpotRadius float64
-}
-
-func NewArrow(spr *pixel.Sprite) *Arrow {
-	a := &Arrow{Entity: *NewEntity(spr, pixel.ZV)}
-	a.Deactivate()
-	a.Scale = 0.7
-	a.Color = colornames.Brown
-	r := pixel.R(-1, -1, 1, 1)
-	a.Collider = &r
-	a.killSpotRadius = 6
-	return a
-}
-
-func (a *Arrow) DistanceToTarget() float64 {
-	return a.Pos.Sub(a.target).Len()
-}
-
-func (a *Arrow) CanKill() bool {
-	return a.DistanceToTarget() <= a.killSpotRadius
-}
-
-func (a *Arrow) Update() {
-	if !a.Active {
-		return
-	}
-	oldDist := a.DistanceToTarget()
-	a.Pos = a.Pos.Add(a.vel.Scaled(engine.dt))
-	newDist := a.DistanceToTarget()
-	size := (a.distance - math.Abs(oldDist-a.distance)) / a.distance
-	a.Scale = 0.7 + size*size
-	if newDist > oldDist {
-		a.Active = false
-		a.Visible = false
-		return
-	}
-	acol := a.AbsCollider()
-	walls := world.GetColliders(acol)
-	for _, wall := range walls {
-		if Collides(acol, wall) {
-			a.Active = false
-			a.Visible = false
-			return
-		}
-	}
-}
-
 var (
 	engine *Engine
 	world  *World
@@ -212,7 +160,7 @@ func run() {
 			arrow.Visible = true
 			arrow.Pos = hero.Pos.Add(gunDir.Scaled(12))
 			arrow.Angle = gunDir.Angle()
-			arrow.vel = gunDir.Scaled(100)
+			arrow.vel = gunDir.Scaled(150).Add(hero.velocity.Scaled(0.01))
 			arrow.target = mousePos
 			arrow.distance = arrow.Pos.Sub(arrow.target).Len() / 2
 		}

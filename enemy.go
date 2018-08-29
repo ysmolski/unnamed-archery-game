@@ -16,9 +16,9 @@ type Slime struct {
 
 func NewSlime(spr *pixel.Sprite) *Slime {
 	sl := &Slime{Entity: *NewEntity(spr, pixel.ZV)}
-	sl.Scale = 1
+	sl.ScaleXY = pixel.V(1, 1)
 	sl.Color = colornames.Red
-	s := float64(world.gridSize / 4)
+	s := float64(world.gridSize) / 2.5
 	r := pixel.R(-s, -s, s, s)
 	sl.Collider = &r
 	sl.speed = 40
@@ -33,6 +33,7 @@ func (s *Slime) Spawn() {
 	s.Pos.Y = rand.Float64()*float64((world.height-3)*world.gridSize) + float64(world.gridSize)
 	s.rotation = rand.Float64()
 	s.speed = s.rotation*40 + 30
+	//s.speed /= 1000
 	// TODO: check that we dont overlap the player
 	s.Active = true
 	s.Visible = true
@@ -48,6 +49,7 @@ func (s *Slime) Update(h *Hero, arrow *Arrow) {
 	wcol := s.AbsCollider()
 	if Collides(wcol, h.AbsCollider()) {
 		h.Damage(-s.drainRate * engine.dt)
+		h.SlowDown()
 	}
 
 	if arrow.Active && arrow.CanKill() && Collides(wcol, arrow.AbsCollider()) {

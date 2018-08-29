@@ -10,7 +10,7 @@ import (
 type Entity struct {
 	Sprite   *pixel.Sprite
 	Pos      pixel.Vec
-	Scale    float64
+	ScaleXY  pixel.Vec
 	Angle    float64
 	Color    color.RGBA
 	Collider *pixel.Rect
@@ -26,7 +26,7 @@ func NewEntity(sprite *pixel.Sprite, pos pixel.Vec) *Entity {
 	e := &Entity{
 		Sprite:  sprite,
 		Pos:     pos,
-		Scale:   1.0,
+		ScaleXY: pixel.V(1, 1),
 		Angle:   0,
 		Color:   colornames.White,
 		Active:  true,
@@ -37,7 +37,7 @@ func NewEntity(sprite *pixel.Sprite, pos pixel.Vec) *Entity {
 
 func (e *Entity) Draw(t pixel.Target) {
 	if e.Visible {
-		m := pixel.IM.Scaled(pixel.ZV, e.Scale).Rotated(pixel.ZV, e.Angle).Moved(e.Pos)
+		m := pixel.IM.ScaledXY(pixel.ZV, e.ScaleXY).Rotated(pixel.ZV, e.Angle).Moved(e.Pos)
 		e.Sprite.DrawColorMask(t, m, e.Color)
 	}
 }

@@ -29,6 +29,10 @@ func (h *Hero) Damage(health float64) {
 	h.health += health
 }
 
+func (h *Hero) SlowDown() {
+	h.velocity = h.velocity.Scaled(0.8)
+}
+
 func (h *Hero) Update(walls []pixel.Rect) {
 	pct := h.health / h.maxHealth * 100
 	switch {
