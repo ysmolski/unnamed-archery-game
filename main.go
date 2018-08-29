@@ -57,12 +57,52 @@ func Collides(a, b pixel.Rect) bool {
 
 type Arrow struct {
 	Entity
-	vel      pixel.Vec
-	target   pixel.Vec
-	distance float64
+	vel      pixel.Vec // velocity of the arrow
+	target   pixel.Vec // where the arrow should drop down
+	distance float64   // half the distance from original spawn point to the target
 }
 
-var engine *Engine
+func NewArrow(spr *pixel.Sprite) *Arrow {
+	a := &Arrow{Entity: *NewEntity(spr, pixel.ZV)}
+	a.Scale = 0.7
+	a.Color = colornames.Brown
+	s := float64(world.gridSize / 4)
+	r := pixel.R(-s, -s, s, s)
+	a.Collider = &r
+	a.Active = false
+	a.Visible = false
+	return a
+}
+
+func (a *Arrow) Update() {
+	if !a.Active {
+		return
+	}
+	oldDist := a.Pos.Sub(a.target).Len()
+	a.Pos = a.Pos.Add(a.vel.Scaled(engine.dt))
+	newDist := a.Pos.Sub(a.target).Len()
+	//size := (ar.distance - math.Abs(oldDist-ar.distance)) / ar.distance
+	//ar.Scale = 0.5 + size*size
+	if newDist > oldDist {
+		a.Active = false
+		a.Visible = false
+		return
+	}
+	acol := a.AbsCollider()
+	walls := world.GetColliders(acol)
+	for _, wall := range walls {
+		if Collides(acol, wall) {
+			a.Active = false
+			a.Visible = false
+			return
+		}
+	}
+}
+
+var (
+	engine *Engine
+	world  *World
+)
 
 func run() {
 	rand.Seed(int64(time.Now().Nanosecond()))
@@ -90,7 +130,7 @@ func run() {
 	}
 	engine = NewEngine(&cfg)
 
-	world := NewWorld(28, 14, sSize)
+	world = NewWorld(28, 14, sSize)
 	sprWall := pixel.NewSprite(tileset, frames[256-37])
 	matWalls := make([]pixel.Matrix, 0, 32*16)
 	for x := 0; x < world.width; x++ {
@@ -123,7 +163,7 @@ func run() {
 	mPosTxt := text.New(pixel.V(-32, -32), atlas)
 
 	sprArrow := pixel.NewSprite(tileset, frames[26])
-	var arrow *Arrow
+	arrow := NewArrow(sprArrow)
 
 	win := engine.win
 	for !win.Closed() {
@@ -144,43 +184,15 @@ func run() {
 		gunStart := origin.Add(gunDir.Scaled(6))
 		gunEnd := origin.Add(gunDir.Scaled(12))
 
-		if arrow != nil {
-			distance := arrow.Pos.Sub(arrow.target).Len()
-			arrow.Pos = arrow.Pos.Add(arrow.vel.Scaled(engine.dt))
-			//size := (ar.distance - math.Abs(distance-ar.distance)) / ar.distance
-			//ar.Scale = 0.5 + size*size
-
-			acol := arrow.AbsCollider()
-			walls := world.GetColliders(acol)
-
-			destroyed := false
-			if arrow.Pos.Sub(arrow.target).Len() > distance {
-				destroyed = true
-			}
-			for _, wall := range walls {
-				if Collides(acol, wall) {
-					destroyed = true
-					break
-				}
-			}
-			if destroyed {
-				arrow = nil
-			}
-		}
-
-		if win.JustPressed(pixelgl.MouseButton1) && arrow == nil {
-			arrow = &Arrow{Entity: *NewEntity(sprArrow, hero.Pos)}
-			arrow.Pos = arrow.Pos.Add(gunDir.Scaled(12))
-			arrow.Scale = 0.7
+		arrow.Update()
+		if win.JustPressed(pixelgl.MouseButton1) && !arrow.Active {
+			arrow.Active = true
+			arrow.Visible = true
+			arrow.Pos = hero.Pos.Add(gunDir.Scaled(12))
 			arrow.Angle = gunDir.Angle()
-			arrow.Color = colornames.Brown
 			arrow.vel = gunDir.Scaled(200)
 			arrow.target = mousePos
 			arrow.distance = arrow.Pos.Sub(arrow.target).Len() / 2
-			r := pixel.R(-4, -4, 4, 4)
-			arrow.Collider = &r
-			fmt.Println(arrow.Pos)
-			fmt.Println(mousePos)
 		}
 
 		mPosTxt.Clear()
