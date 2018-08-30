@@ -103,7 +103,7 @@ func run() {
 	atlas := text.NewAtlas(basicfont.Face7x13, text.ASCII)
 	mPosTxt := text.New(pixel.V(-32, -32), atlas)
 
-	world = NewWorld(28, 14, sSize)
+	world = NewWorld(60, 30, sSize)
 	sprWall := pixel.NewSprite(tileset, frames[256-37])
 	matWalls := make([]pixel.Matrix, 0, 32*16)
 	for x := 0; x < world.width; x++ {
@@ -146,6 +146,7 @@ func run() {
 
 		walls := world.GetColliders(hero.AbsCollider())
 		hero.Update(walls)
+		camera.Follow(hero.Pos)
 
 		mousePos := camMat.Unproject(win.MousePosition())
 		// gun
