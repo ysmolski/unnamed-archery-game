@@ -8,7 +8,9 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 	"time"
 
 	"image/color"
@@ -88,7 +90,7 @@ func run() {
 	cfg := pixelgl.WindowConfig{
 		Title:  "A World",
 		Bounds: pixel.R(0, 0, 1000, 600),
-		VSync:  true,
+		VSync:  false,
 	}
 	engine = NewEngine(&cfg)
 
@@ -101,7 +103,7 @@ func run() {
 
 	// font
 	atlas := text.NewAtlas(basicfont.Face7x13, text.ASCII)
-	mPosTxt := text.New(pixel.V(-32, -32), atlas)
+	mPosTxt := text.New(pixel.V(8, engine.win.Bounds().Max.Y-16), atlas)
 
 	sprWall := pixel.NewSprite(tileset, frames[256-37])
 	var sprBG []*pixel.Sprite
@@ -133,14 +135,26 @@ func run() {
 	activeSlimes := 0
 	slimeTicker := time.Tick(4 * time.Second)
 
+	targetFrameTime := 8200 * time.Microsecond
+
+	gcOnFrame := 60
+	gcFrame := 0
+
 	win := engine.win
 	for !win.Closed() {
+		gcFrame++
+		if gcFrame >= gcOnFrame {
+			runtime.GC()
+			gcFrame = 0
+		}
+		for time.Since(engine.prevFrameStarted) < targetFrameTime {
+			time.Sleep(100 * time.Microsecond)
+		}
 		engine.dt = time.Since(engine.prevFrameStarted).Seconds()
 		engine.prevFrameStarted = time.Now()
 
-		camMat := camera.GetMatrix()
-		win.SetMatrix(camMat)
 		camera.Update()
+		camMat := camera.GetMatrix()
 
 		walls := world.GetColliders(hero.AbsCollider())
 		hero.Update(walls)
@@ -189,10 +203,12 @@ func run() {
 		fmt.Fprintf(mPosTxt, "hpos: %6.3f %6.3f\n", hero.Pos.X, hero.Pos.Y)
 		fmt.Fprintf(mPosTxt, "hvel: %6.3f %6.3f %6.3f\n", hero.velocity.X, hero.velocity.Y, hero.velocity.Len())
 		fmt.Fprintf(mPosTxt, "health: %6.3f\n", hero.health)
+		fmt.Fprintf(mPosTxt, "dt: %6.4f\n", engine.dt)
 
 		//
 		// draw
 		///////////////////////////////////////////////
+		win.SetMatrix(camMat)
 		win.Clear(darkblue)
 
 		// tileset batch
@@ -218,7 +234,8 @@ func run() {
 		imd.Draw(win)
 
 		// debug text
-		mPosTxt.Draw(win, pixel.IM.Scaled(mPosTxt.Orig, 0.5))
+		win.SetMatrix(pixel.IM)
+		mPosTxt.Draw(win, pixel.IM.Scaled(mPosTxt.Orig, 1))
 
 		win.Update()
 
@@ -227,8 +244,13 @@ func run() {
 }
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
+var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
+var traceprofile = flag.String("traceprofile", "", "write trace profile to file")
 
 func main() {
+	if *memprofile != "" {
+		runtime.MemProfileRate = 16
+	}
 	flag.Parse()
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -238,5 +260,30 @@ func main() {
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
+	if *traceprofile != "" {
+		f, err := os.Create(*traceprofile)
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+
+		err = trace.Start(f)
+		if err != nil {
+			panic(err)
+		}
+		defer trace.Stop()
+
+	}
 	pixelgl.Run(run)
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Fatal("could not create memory profile: ", err)
+		}
+		runtime.GC() // get up-to-date statistics
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			log.Fatal("could not write memory profile: ", err)
+		}
+		f.Close()
+	}
 }

@@ -1,3 +1,6 @@
 * make gameover screen
 * make press to start screen
-* figure out how to make text written independed from win.Matrix
+* make nice progression of difficulty
+* enemies should become faster and meaner
+* figure out why drawing creates so many objects here: github.com/faiface/pixel.(*TrianglesData).Slice
+
