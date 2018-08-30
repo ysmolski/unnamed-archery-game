@@ -156,13 +156,7 @@ func run() {
 
 		arrow.Update()
 		if win.JustPressed(pixelgl.MouseButton1) && !arrow.Active {
-			arrow.Active = true
-			arrow.Visible = true
-			arrow.Pos = hero.Pos.Add(gunDir.Scaled(12))
-			arrow.Angle = gunDir.Angle()
-			arrow.vel = gunDir.Scaled(150).Add(hero.velocity.Scaled(0.01))
-			arrow.target = mousePos
-			arrow.distance = arrow.Pos.Sub(arrow.target).Len() / 2
+			arrow.Spawn(hero.Pos, mousePos, hero.velocity.Scaled(0.2))
 		}
 
 		for i := range slimes {
@@ -204,13 +198,12 @@ func run() {
 
 		// debug
 		imd.Clear()
-		imd.Color = colornames.Blueviolet
-
-		//drawRect(imd, hero.Collider.Moved(origin))
-
+		imd.Color = colornames.Whitesmoke
 		imd.Push(gunStart, gunEnd)
 		imd.Line(2)
 
+		imd.Color = colornames.Blueviolet
+		//drawRect(imd, hero.Collider.Moved(origin))
 		imd.Draw(win)
 
 		// debug text

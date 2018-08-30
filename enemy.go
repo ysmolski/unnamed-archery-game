@@ -33,7 +33,7 @@ func (s *Slime) Spawn() {
 	s.Pos.Y = rand.Float64()*float64((world.height-3)*world.gridSize) + float64(world.gridSize)
 	s.rotation = rand.Float64()
 	s.speed = s.rotation*40 + 30
-	//s.speed /= 1000
+	// s.speed /= 1000
 	// TODO: check that we dont overlap the player
 	s.Active = true
 	s.Visible = true

@@ -12,7 +12,8 @@ type Arrow struct {
 	baseScale      float64
 	vel            pixel.Vec // velocity of the arrow
 	target         pixel.Vec // where the arrow should drop down
-	distance       float64   // half the distance from original spawn point to the target
+	halfDistance   float64   // half the distance from original spawn point to the target
+	maxHeight      float64
 	killSpotRadius float64
 }
 
@@ -33,21 +34,46 @@ func (a *Arrow) DistanceToTarget() float64 {
 }
 
 func (a *Arrow) CanKill() bool {
-	// TODO: calculate this precisely?
-	return a.DistanceToTarget() <= a.killSpotRadius
+	return a.CurrentHeight() < 8
+}
+
+// DistanceFromEnds returns values in range 0 ... 1 ... 0,
+// it returns 1 in the middle (the highest point) of trajectory.
+func (a *Arrow) DistanceFromEnds() float64 {
+	return (a.halfDistance - math.Abs(a.DistanceToTarget()-a.halfDistance)) / a.halfDistance
+}
+
+func (a *Arrow) CurrentHeight() float64 {
+	return a.maxHeight * math.Sqrt(a.DistanceFromEnds())
+}
+
+func (a *Arrow) Spawn(from, to, relational pixel.Vec) {
+	a.Active = true
+	a.Visible = true
+	dir := to.Sub(from).Unit()
+	a.Pos = from.Add(dir.Scaled(6))
+	a.Angle = dir.Angle()
+	a.vel = dir.Scaled(150).Add(relational)
+	a.target = to
+	a.halfDistance = a.Pos.Sub(a.target).Len() / 2
+	// height takes values in range [0, 50]
+	a.maxHeight = pixel.Clamp(a.halfDistance/2, 0, 100)
+	// fmt.Println(a.halfDistance, a.maxHeight)
 }
 
 func (a *Arrow) Update() {
 	if !a.Active {
 		return
 	}
+	size := math.Sqrt(a.DistanceFromEnds())
 	oldDist := a.DistanceToTarget()
 	a.Pos = a.Pos.Add(a.vel.Scaled(engine.dt))
 	newDist := a.DistanceToTarget()
-	size := (a.distance - math.Abs(oldDist-a.distance)) / a.distance
-	// scaling should depend on the a.distance
-	a.ScaleXY.X = 0.5 + size*size
-	a.ScaleXY.Y = 0.7 + size/2
+	// Maximum scaling should depend on the a.distance.
+	// If we shot on short distance then arrow should not rise high to the air.
+	a.ScaleXY.X = 1.0 + size*a.maxHeight/100 - a.maxHeight/150
+	a.ScaleXY.Y = 1.0 + size*a.maxHeight/100
+	//fmt.Printf("%4.2f %4.2f\n", size, a.ScaleXY.X)
 	if newDist > oldDist {
 		a.Active = false
 		a.Visible = false
