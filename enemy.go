@@ -29,8 +29,7 @@ func NewSlime(spr *pixel.Sprite) *Slime {
 }
 
 func (s *Slime) Spawn() {
-	s.Pos.X = rand.Float64()*float64((world.width-3)*world.gridSize) + float64(world.gridSize)
-	s.Pos.Y = rand.Float64()*float64((world.height-3)*world.gridSize) + float64(world.gridSize)
+	s.Pos = world.RandomVec()
 	s.rotation = rand.Float64()
 	s.speed = s.rotation*40 + 30
 	// s.speed /= 1000

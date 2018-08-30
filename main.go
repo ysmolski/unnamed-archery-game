@@ -62,7 +62,7 @@ var (
 )
 
 var (
-	darkblue = color.RGBA{0, 9, 26, 255}
+	darkblue = color.RGBA{0, 18, 34, 255}
 	darkgray = color.RGBA{100, 111, 130, 255}
 )
 
@@ -103,16 +103,14 @@ func run() {
 	atlas := text.NewAtlas(basicfont.Face7x13, text.ASCII)
 	mPosTxt := text.New(pixel.V(-32, -32), atlas)
 
-	world = NewWorld(60, 30, sSize)
 	sprWall := pixel.NewSprite(tileset, frames[256-37])
-	matWalls := make([]pixel.Matrix, 0, 32*16)
-	for x := 0; x < world.width; x++ {
-		for y := 0; y < world.height; y++ {
-			if world.cells[x][y] == CellWall {
-				matWalls = append(matWalls, pixel.IM.Moved(pixel.V(float64(x*world.gridSize), float64(y*world.gridSize))))
-			}
-		}
-	}
+	var sprBG []*pixel.Sprite
+	sprBG = append(sprBG, pixel.NewSprite(tileset, frames[176]))
+	sprBG = append(sprBG, pixel.NewSprite(tileset, frames[177]))
+	sprBG = append(sprBG, pixel.NewSprite(tileset, frames[178]))
+	sprBG = append(sprBG, pixel.NewSprite(tileset, frames[256-37]))
+	sprBG = append(sprBG, pixel.NewSprite(tileset, frames[256-36]))
+	world = NewWorld(60, 30, sSize, sprWall, sprBG)
 
 	spr := pixel.NewSprite(tileset, frames[1])
 	hero := NewHero(
@@ -197,6 +195,18 @@ func run() {
 		///////////////////////////////////////////////
 		win.Clear(darkblue)
 
+		// tileset batch
+		batch.Clear()
+		world.Draw(batch)
+		if arrow != nil {
+			arrow.Draw(batch)
+		}
+		hero.Draw(batch)
+		for i := range slimes {
+			slimes[i].Draw(batch)
+		}
+		batch.Draw(win)
+
 		// debug
 		imd.Clear()
 		imd.Color = colornames.Whitesmoke
@@ -208,21 +218,7 @@ func run() {
 		imd.Draw(win)
 
 		// debug text
-		mPosTxt.Draw(win, pixel.IM.Scaled(mPosTxt.Orig, .5))
-
-		// tileset batch
-		batch.Clear()
-		hero.Draw(batch)
-		for _, m := range matWalls {
-			sprWall.DrawColorMask(batch, m, darkgray)
-		}
-		if arrow != nil {
-			arrow.Draw(batch)
-		}
-		for i := range slimes {
-			slimes[i].Draw(batch)
-		}
-		batch.Draw(win)
+		mPosTxt.Draw(win, pixel.IM.Scaled(mPosTxt.Orig, 0.5))
 
 		win.Update()
 
