@@ -97,7 +97,7 @@ func run() {
 
 	cfg := pixelgl.WindowConfig{
 		Title:  "A World",
-		Bounds: pixel.R(0, 0, 1000, 600),
+		Bounds: pixel.R(0, 0, 1400, 800),
 		VSync:  false,
 	}
 	engine = NewEngine(&cfg)
@@ -112,6 +112,8 @@ func run() {
 
 	camera := NewCamera(engine.win)
 	camera.Pos = pixel.V(216, 83)
+	camera.Zoom = 4
+	camera.Speed = 1
 
 	// font
 	atlas := text.NewAtlas(basicfont.Face7x13, text.ASCII)
@@ -141,9 +143,10 @@ func run() {
 	bow.Color = colornames.Gold
 
 	sprArrow := pixel.NewSprite(tileset, frames[26])
+	sprStuckArrow := pixel.NewSprite(tileset, frames[27])
 	arrows := make([]*Arrow, 100)
 	for i := range arrows {
-		arrows[i] = NewArrow(sprArrow)
+		arrows[i] = NewArrow(sprArrow, sprStuckArrow)
 	}
 	nextArrow := TimeScheduler(1.5, 0.02)
 
@@ -155,7 +158,6 @@ func run() {
 	nextSlime := TimeScheduler(5.0, 0.02)
 
 	targetFrameTime := 8000 * time.Microsecond
-
 	gcOnFrame := 120
 	gcFrame := 0
 	var gcTime time.Duration
@@ -204,14 +206,21 @@ func run() {
 
 		walls := world.GetColliders(hero.AbsCollider())
 		hero.Update(walls)
-		camera.Follow(hero.Pos)
 
 		// bow
 		{
 			dir := mousePos.Sub(hero.Pos).Unit()
-			bow.Pos = hero.Pos.Add(dir.Scaled(ArrowStart - 3))
+			bow.Pos = hero.Pos.Add(dir.Scaled(ArrowStartDistance - 3))
 			bow.Angle = dir.Angle()
 		}
+
+		lookAt := hero.Pos.Add(
+			mousePos.
+				Sub(hero.Pos).
+				Unit().
+				Scaled(64))
+		lookAt = lookAt.Add(hero.velocity.Scaled(0.64))
+		camera.Follow(lookAt)
 
 		// arrows
 		for _, a := range arrows {

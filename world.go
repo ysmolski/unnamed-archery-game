@@ -11,7 +11,7 @@ import (
 type CellType uint8
 
 const (
-	CellEmpty = iota
+	CellEmpty CellType = iota
 	CellWall
 	CellStone
 	numberOfCellTypes

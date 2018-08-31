@@ -52,9 +52,9 @@ func (s *Slime) Update(h *Hero, arrows []*Arrow) {
 	}
 
 	for _, arrow := range arrows {
-		if arrow.Active && arrow.CanKill() && Collides(wcol, arrow.AbsCollider()) {
+		if arrow.Kills(wcol) {
 			s.Deactivate()
-			arrow.Deactivate()
+			arrow.Stick()
 		}
 	}
 }

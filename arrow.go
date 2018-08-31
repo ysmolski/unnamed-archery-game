@@ -9,25 +9,36 @@ import (
 
 type Arrow struct {
 	Entity
+	StuckSprite  *pixel.Sprite
 	baseScale    float64
 	vel          pixel.Vec // velocity of the arrow
 	target       pixel.Vec // where the arrow should drop down
 	halfDistance float64   // half the distance from original spawn point to the target
 	maxHeight    float64
-	flying       bool
+	State        ArrowState
 }
 
-const ArrowStart = 10.0
+// Arrow starts this far from the center of the hero.
+const ArrowStartDistance = 10.0
 
-func NewArrow(spr *pixel.Sprite) *Arrow {
-	a := &Arrow{Entity: *NewEntity(spr, pixel.ZV)}
+type ArrowState uint8
+
+const (
+	ArrowInactive ArrowState = iota
+	ArrowDraw
+	ArrowFlying
+	ArrowStuck
+)
+
+func NewArrow(normal, stuck *pixel.Sprite) *Arrow {
+	a := &Arrow{Entity: *NewEntity(normal, pixel.ZV)}
+	a.StuckSprite = stuck
 	a.Deactivate()
-	a.baseScale = 0.7
-	a.ScaleXY = pixel.V(a.baseScale, a.baseScale)
+	a.State = ArrowInactive
+	a.baseScale = 1
 	a.Color = colornames.Goldenrod
 	r := pixel.R(-1, -1, 1, 1)
 	a.Collider = &r
-	a.flying = false
 	return a
 }
 
@@ -52,21 +63,21 @@ func (a *Arrow) CurrentHeight() float64 {
 func (a *Arrow) Spawn() {
 	a.Active = true
 	a.Visible = true
-	a.flying = false
+	a.State = ArrowDraw
 }
 
 func (a *Arrow) SyncWith(from, to pixel.Vec) {
 	dir := to.Sub(from).Unit()
-	a.Pos = from.Add(dir.Scaled(ArrowStart))
+	a.Pos = from.Add(dir.Scaled(ArrowStartDistance))
 	a.Angle = dir.Angle()
 	a.ScaleXY.X = 1.0
 	a.ScaleXY.Y = 1.0
 }
 
 func (a *Arrow) Fly(from, to, relational pixel.Vec) {
-	a.flying = true
+	a.State = ArrowFlying
 	dir := to.Sub(from).Unit()
-	a.Pos = from.Add(dir.Scaled(ArrowStart))
+	a.Pos = from.Add(dir.Scaled(ArrowStartDistance))
 	a.Angle = dir.Angle()
 	a.vel = dir.Scaled(150).Add(relational)
 	a.target = to
@@ -76,8 +87,20 @@ func (a *Arrow) Fly(from, to, relational pixel.Vec) {
 	// fmt.Println(a.halfDistance, a.maxHeight)
 }
 
+func (a *Arrow) Kills(col pixel.Rect) bool {
+	return a.State == ArrowFlying && a.CanKill() && Collides(col, a.AbsCollider())
+}
+
+func (a *Arrow) Stick() {
+	a.State = ArrowStuck
+}
+
 func (a *Arrow) Update() {
-	if !a.Active || !a.flying {
+	if a.State == ArrowStuck {
+
+	}
+
+	if !a.Active || a.State != ArrowFlying {
 		return
 	}
 	size := math.Sqrt(a.DistanceFromEnds())
@@ -91,25 +114,37 @@ func (a *Arrow) Update() {
 		// make size smaller close to the target since arrow drops to the floow
 		perspect += (a.halfDistance - newDist) / a.halfDistance / 5
 	}
-	a.ScaleXY.X = 1.0 + size*a.maxHeight/100 - perspect
-	a.ScaleXY.Y = 1.0 + size*a.maxHeight/100
+	a.ScaleXY.X = a.baseScale + size*a.maxHeight/100 - perspect
+	a.ScaleXY.Y = a.baseScale + size*a.maxHeight/100
 	//fmt.Printf("%4.2f %4.2f\n", size, a.ScaleXY.X)
 	if newDist > oldDist {
-		a.Active = false
-		a.Visible = false
-		a.flying = false
+		// a.Active = false
+		// a.Visible = false
+		a.State = ArrowStuck
 		return
 	}
 	acol := a.AbsCollider()
 	walls := world.GetColliders(acol)
 	for _, wall := range walls {
 		if Collides(acol, wall) {
-			a.Active = false
-			a.Visible = false
-			a.flying = false
+			// a.Active = false
+			// a.Visible = false
+			a.State = ArrowStuck
 			return
 		}
 	}
+}
+
+func (a *Arrow) Draw(t pixel.Target) {
+	if a.Visible {
+		m := pixel.IM.ScaledXY(pixel.ZV, a.ScaleXY).Rotated(pixel.ZV, a.Angle).Moved(a.Pos)
+		if a.State == ArrowStuck {
+			a.StuckSprite.DrawColorMask(t, m, a.Color)
+		} else {
+			a.Sprite.DrawColorMask(t, m, a.Color)
+		}
+	}
+
 }
 
 func firstFreeArrow(s []*Arrow) int {

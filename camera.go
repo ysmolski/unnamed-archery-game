@@ -13,7 +13,7 @@ type Camera struct {
 }
 
 func NewCamera(win *pixelgl.Window) *Camera {
-	return &Camera{win, pixel.ZV, 1.0, 2, 1.1}
+	return &Camera{win, pixel.ZV, 1.0, 1, 1.1}
 }
 
 func (c *Camera) GetMatrix() pixel.Matrix {
@@ -22,7 +22,7 @@ func (c *Camera) GetMatrix() pixel.Matrix {
 
 func (c *Camera) Follow(p pixel.Vec) {
 	dist := p.Sub(c.Pos).Len()
-	if dist > 32 {
+	if dist > 8 {
 		c.Pos = pixel.Lerp(c.Pos, p, c.Speed*engine.dt)
 	}
 }
