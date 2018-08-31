@@ -139,24 +139,46 @@ func run() {
 	activeSlimes := 0
 	slimeTicker := time.Tick(4 * time.Second)
 
-	targetFrameTime := 8200 * time.Microsecond
+	targetFrameTime := 8000 * time.Microsecond
 
-	gcOnFrame := 60
+	gcOnFrame := 120
 	gcFrame := 0
+	var gcTime time.Duration
+
+	var (
+		dtMax       float64
+		dtUpdate    float64
+		dtDraw      float64
+		dtUpdateMax float64
+		dtDrawMax   float64
+	)
 
 	win := engine.win
 	for !win.Closed() {
 		gcFrame++
 		if gcFrame >= gcOnFrame {
+			// When I run this game on machine with 2 cores CPU,
+			// I get stuttering when something runs in background. Is it related to
+			// GC or just a problem of slow hardware?
+			// When I do not invoke GC manually I get many slow frames.
+			gcSt := time.Now()
 			runtime.GC()
+			gcTime = time.Since(gcSt)
 			gcFrame = 0
+			dtMax = 0
+			dtUpdateMax = 0
+			dtDrawMax = 0
 		}
 		for time.Since(engine.prevFrameStarted) < targetFrameTime {
-			time.Sleep(100 * time.Microsecond)
+			time.Sleep(200 * time.Microsecond)
 		}
 		engine.dt = time.Since(engine.prevFrameStarted).Seconds()
 		engine.prevFrameStarted = time.Now()
+		if engine.dt > dtMax {
+			dtMax = engine.dt
+		}
 
+		dtUpdateSt := time.Now()
 		camera.Update()
 		camMat := camera.GetMatrix()
 
@@ -203,15 +225,25 @@ func run() {
 		}
 
 		mPosTxt.Clear()
-		fmt.Fprintf(mPosTxt, "mpos: %6.3f %6.3f\n", mousePos.X, mousePos.Y)
-		fmt.Fprintf(mPosTxt, "hpos: %6.3f %6.3f\n", hero.Pos.X, hero.Pos.Y)
-		fmt.Fprintf(mPosTxt, "hvel: %6.3f %6.3f %6.3f\n", hero.velocity.X, hero.velocity.Y, hero.velocity.Len())
-		fmt.Fprintf(mPosTxt, "health: %6.3f\n", hero.health)
-		fmt.Fprintf(mPosTxt, "dt: %6.4f\n", engine.dt)
+		// fmt.Fprintf(mPosTxt, "mpos: %6.3f %6.3f\n", mousePos.X, mousePos.Y)
+		// fmt.Fprintf(mPosTxt, "hpos: %6.3f %6.3f\n", hero.Pos.X, hero.Pos.Y)
+		// fmt.Fprintf(mPosTxt, "hvel: %6.3f %6.3f %6.3f\n", hero.velocity.X, hero.velocity.Y, hero.velocity.Len())
+		// fmt.Fprintf(mPosTxt, "health: %6.1f\n", hero.health)
+		fmt.Fprintf(mPosTxt, "cur dt: %6.5f\n", engine.dt)
+		fmt.Fprintf(mPosTxt, "max dt: %6.5f\n", dtMax)
+		fmt.Fprintf(mPosTxt, "dt upd: %6.5f\n", dtUpdateMax)
+		fmt.Fprintf(mPosTxt, "dt dra: %6.5f\n", dtDrawMax)
+		fmt.Fprintf(mPosTxt, "gc: %7d\n", gcTime.Nanoseconds())
+
+		dtUpdate = time.Since(dtUpdateSt).Seconds()
+		if dtUpdate > dtUpdateMax {
+			dtUpdateMax = dtUpdate
+		}
 
 		//
 		// draw
 		///////////////////////////////////////////////
+		dtDrawSt := time.Now()
 		win.SetMatrix(camMat)
 		win.Clear(darkblue)
 
@@ -242,8 +274,12 @@ func run() {
 		mPosTxt.Draw(win, pixel.IM.Scaled(mPosTxt.Orig, 1))
 
 		win.Update()
-
 		engine.fpsHandler()
+
+		dtDraw = time.Since(dtDrawSt).Seconds()
+		if dtDraw > dtDrawMax {
+			dtDrawMax = dtDraw
+		}
 	}
 }
 

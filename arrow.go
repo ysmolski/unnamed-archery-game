@@ -57,7 +57,7 @@ func (a *Arrow) Spawn(from, to, relational pixel.Vec) {
 	a.target = to
 	a.halfDistance = a.Pos.Sub(a.target).Len() / 2
 	// height takes values in range [0, 50]
-	a.maxHeight = pixel.Clamp(a.halfDistance/2, 0, 100)
+	a.maxHeight = pixel.Clamp(a.halfDistance/1.2, 0, 100)
 	// fmt.Println(a.halfDistance, a.maxHeight)
 }
 
