@@ -96,6 +96,10 @@ func run() {
 
 	trid := &pixel.TrianglesData{}
 	batch := pixel.NewBatch(trid, tileset)
+
+	tridBg := &pixel.TrianglesData{}
+	batchBg := pixel.NewBatch(tridBg, tileset)
+
 	imd := imdraw.New(nil)
 
 	camera := NewCamera(engine.win)
@@ -112,7 +116,7 @@ func run() {
 	sprBG = append(sprBG, pixel.NewSprite(tileset, frames[178]))
 	sprBG = append(sprBG, pixel.NewSprite(tileset, frames[256-37]))
 	sprBG = append(sprBG, pixel.NewSprite(tileset, frames[256-36]))
-	world = NewWorld(60, 30, sSize, sprWall, sprBG)
+	world = NewWorld(60, 30, sSize, sprWall, sprBG, batchBg)
 
 	spr := pixel.NewSprite(tileset, frames[1])
 	hero := NewHero(

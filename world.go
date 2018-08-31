@@ -22,9 +22,10 @@ type World struct {
 	width, height int
 	cells         [][]CellType
 
-	wallMats   []pixel.Matrix
-	wallColors []color.RGBA
-	wallSprite *pixel.Sprite
+	staticBatch *pixel.Batch
+	wallMats    []pixel.Matrix
+	wallColors  []color.RGBA
+	wallSprite  *pixel.Sprite
 
 	floorSpriteIdx []int
 	floorMats      []pixel.Matrix
@@ -47,7 +48,7 @@ var floorColors = [...]color.RGBA{
 	color.RGBA{0, 38, 49, 255},
 }
 
-func NewWorld(width, height, gridSize int, sprWall *pixel.Sprite, sprFloor []*pixel.Sprite) *World {
+func NewWorld(width, height, gridSize int, sprWall *pixel.Sprite, sprFloor []*pixel.Sprite, batch *pixel.Batch) *World {
 	w := &World{gridSize: gridSize, width: width, height: height}
 	w.cells = make([][]CellType, width)
 	for i := 0; i < width; i++ {
@@ -60,6 +61,10 @@ func NewWorld(width, height, gridSize int, sprWall *pixel.Sprite, sprFloor []*pi
 			}
 		}
 	}
+
+	// Generate wall tiles.
+	w.staticBatch = batch
+	w.staticBatch.Clear()
 	w.wallSprite = sprWall
 	for x := 0; x < width; x++ {
 		for y := 0; y < height; y++ {
@@ -84,6 +89,8 @@ func NewWorld(width, height, gridSize int, sprWall *pixel.Sprite, sprFloor []*pi
 			}
 		}
 	}
+
+	// Generate floor tiles.
 	w.floorSprites = append(w.floorSprites, sprFloor...)
 	for x := 1; x < width-1; x++ {
 		for y := 1; y < height-1; y++ {
@@ -108,6 +115,14 @@ func NewWorld(width, height, gridSize int, sprWall *pixel.Sprite, sprFloor []*pi
 			w.floorMats = append(w.floorMats, mat)
 			w.floorColors = append(w.floorColors, col)
 		}
+	}
+
+	// Write static background to staticBatch.
+	for i := range w.floorMats {
+		w.floorSprites[w.floorSpriteIdx[i]].DrawColorMask(w.staticBatch, w.floorMats[i], w.floorColors[i])
+	}
+	for i := range w.wallMats {
+		w.wallSprite.DrawColorMask(w.staticBatch, w.wallMats[i], w.wallColors[i])
 	}
 	// // random walls
 	// for i := 0; i < 10; i++ {
@@ -153,10 +168,11 @@ func (w *World) GetColliders(collider pixel.Rect) []pixel.Rect {
 }
 
 func (w *World) Draw(t pixel.Target) {
-	for i := range w.floorMats {
-		w.floorSprites[w.floorSpriteIdx[i]].DrawColorMask(t, w.floorMats[i], w.floorColors[i])
-	}
-	for i := range w.wallMats {
-		w.wallSprite.DrawColorMask(t, w.wallMats[i], w.wallColors[i])
-	}
+	w.staticBatch.Draw(t)
+	// for i := range w.floorMats {
+	// 	w.floorSprites[w.floorSpriteIdx[i]].DrawColorMask(t, w.floorMats[i], w.floorColors[i])
+	// }
+	// for i := range w.wallMats {
+	// 	w.wallSprite.DrawColorMask(t, w.wallMats[i], w.wallColors[i])
+	// }
 }
