@@ -9,12 +9,12 @@ import (
 
 type Arrow struct {
 	Entity
-	baseScale      float64
-	vel            pixel.Vec // velocity of the arrow
-	target         pixel.Vec // where the arrow should drop down
-	halfDistance   float64   // half the distance from original spawn point to the target
-	maxHeight      float64
-	killSpotRadius float64
+	baseScale    float64
+	vel          pixel.Vec // velocity of the arrow
+	target       pixel.Vec // where the arrow should drop down
+	halfDistance float64   // half the distance from original spawn point to the target
+	maxHeight    float64
+	flying       bool
 }
 
 func NewArrow(spr *pixel.Sprite) *Arrow {
@@ -22,10 +22,10 @@ func NewArrow(spr *pixel.Sprite) *Arrow {
 	a.Deactivate()
 	a.baseScale = 0.7
 	a.ScaleXY = pixel.V(a.baseScale, a.baseScale)
-	a.Color = colornames.Brown
+	a.Color = colornames.Goldenrod
 	r := pixel.R(-1, -1, 1, 1)
 	a.Collider = &r
-	a.killSpotRadius = 6
+	a.flying = false
 	return a
 }
 
@@ -47,9 +47,22 @@ func (a *Arrow) CurrentHeight() float64 {
 	return a.maxHeight * math.Sqrt(a.DistanceFromEnds())
 }
 
-func (a *Arrow) Spawn(from, to, relational pixel.Vec) {
+func (a *Arrow) Spawn() {
 	a.Active = true
 	a.Visible = true
+	a.flying = false
+}
+
+func (a *Arrow) SyncWith(from, to pixel.Vec) {
+	dir := to.Sub(from).Unit()
+	a.Pos = from.Add(dir.Scaled(6))
+	a.Angle = dir.Angle()
+	a.ScaleXY.X = 1.0
+	a.ScaleXY.Y = 1.0
+}
+
+func (a *Arrow) Fly(from, to, relational pixel.Vec) {
+	a.flying = true
 	dir := to.Sub(from).Unit()
 	a.Pos = from.Add(dir.Scaled(6))
 	a.Angle = dir.Angle()
@@ -62,7 +75,7 @@ func (a *Arrow) Spawn(from, to, relational pixel.Vec) {
 }
 
 func (a *Arrow) Update() {
-	if !a.Active {
+	if !a.Active || !a.flying {
 		return
 	}
 	size := math.Sqrt(a.DistanceFromEnds())
@@ -77,6 +90,7 @@ func (a *Arrow) Update() {
 	if newDist > oldDist {
 		a.Active = false
 		a.Visible = false
+		a.flying = false
 		return
 	}
 	acol := a.AbsCollider()
@@ -85,7 +99,19 @@ func (a *Arrow) Update() {
 		if Collides(acol, wall) {
 			a.Active = false
 			a.Visible = false
+			a.flying = false
 			return
 		}
 	}
+}
+
+func firstFreeArrow(s []*Arrow) int {
+	free := -1
+	for i := range s {
+		if !s[i].Active {
+			free = i
+			break
+		}
+	}
+	return free
 }

@@ -8,6 +8,7 @@ import (
 )
 
 type Engine struct {
+	started          time.Time
 	elapsed          float64
 	prevFrameStarted time.Time
 	dt               float64
@@ -25,6 +26,7 @@ func NewEngine(cfg *pixelgl.WindowConfig) *Engine {
 	win.SetSmooth(false)
 
 	return &Engine{
+		started:          time.Now(),
 		win:              win,
 		winCfg:           cfg,
 		fpsTicker:        time.Tick(time.Second),
@@ -33,6 +35,7 @@ func NewEngine(cfg *pixelgl.WindowConfig) *Engine {
 }
 
 func (e *Engine) fpsHandler() {
+	e.elapsed = time.Since(e.started).Seconds()
 	e.fpsCounter++
 	select {
 	case <-e.fpsTicker:

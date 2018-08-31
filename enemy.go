@@ -38,7 +38,7 @@ func (s *Slime) Spawn() {
 	s.Visible = true
 }
 
-func (s *Slime) Update(h *Hero, arrow *Arrow) {
+func (s *Slime) Update(h *Hero, arrows []*Arrow) {
 	// Slimes should "see" the player and fly to touch the player.
 	// TODO: Implement spiralled movement.
 	dir := h.Pos.Sub(s.Pos).Unit().Scaled(s.speed * engine.dt)
@@ -51,8 +51,21 @@ func (s *Slime) Update(h *Hero, arrow *Arrow) {
 		h.SlowDown()
 	}
 
-	if arrow.Active && arrow.CanKill() && Collides(wcol, arrow.AbsCollider()) {
-		s.Deactivate()
-		arrow.Deactivate()
+	for _, arrow := range arrows {
+		if arrow.Active && arrow.CanKill() && Collides(wcol, arrow.AbsCollider()) {
+			s.Deactivate()
+			arrow.Deactivate()
+		}
 	}
+}
+
+func firstFreeSlime(s []*Slime) int {
+	free := -1
+	for i := range s {
+		if !s[i].Active {
+			free = i
+			break
+		}
+	}
+	return free
 }

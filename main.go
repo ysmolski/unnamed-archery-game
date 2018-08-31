@@ -58,6 +58,14 @@ func Collides(a, b pixel.Rect) bool {
 	return true
 }
 
+func TimeScheduler(init, rate float64) func(float64) float64 {
+	next := init
+	return func(t float64) float64 {
+		next := next - t*rate
+		return t + next
+	}
+}
+
 var (
 	engine *Engine
 	world  *World
@@ -116,7 +124,7 @@ func run() {
 	sprBG = append(sprBG, pixel.NewSprite(tileset, frames[178]))
 	sprBG = append(sprBG, pixel.NewSprite(tileset, frames[256-37]))
 	sprBG = append(sprBG, pixel.NewSprite(tileset, frames[256-36]))
-	world = NewWorld(60, 30, sSize, sprWall, sprBG, batchBg)
+	world = NewWorld(40, 25, sSize, sprWall, sprBG, batchBg)
 
 	spr := pixel.NewSprite(tileset, frames[1])
 	hero := NewHero(
@@ -128,16 +136,23 @@ func run() {
 	r := pixel.R(-spr.Frame().W()/2.5, -spr.Frame().H()/2.5, spr.Frame().W()/2.5, spr.Frame().H()/3)
 	hero.Collider = &r
 
+	sprBow := pixel.NewSprite(tileset, frames[28])
+	bow := NewEntity(sprBow, pixel.ZV)
+	bow.Color = colornames.Gold
+
 	sprArrow := pixel.NewSprite(tileset, frames[26])
-	arrow := NewArrow(sprArrow)
+	arrows := make([]*Arrow, 100)
+	for i := range arrows {
+		arrows[i] = NewArrow(sprArrow)
+	}
+	nextArrow := TimeScheduler(1.5, 0.02)
 
 	sprSlime := pixel.NewSprite(tileset, frames[15])
-	var slimes [100]*Slime
+	slimes := make([]*Slime, 100)
 	for i := range slimes {
 		slimes[i] = NewSlime(sprSlime)
 	}
-	activeSlimes := 0
-	slimeTicker := time.Tick(4 * time.Second)
+	nextSlime := TimeScheduler(5.0, 0.02)
 
 	targetFrameTime := 8000 * time.Microsecond
 
@@ -152,6 +167,10 @@ func run() {
 		dtUpdateMax float64
 		dtDrawMax   float64
 	)
+
+	nextSlimeTime := nextSlime(engine.elapsed)
+	nextArrowTime := nextArrow(engine.elapsed)
+	var arrowInHand *Arrow
 
 	win := engine.win
 	for !win.Closed() {
@@ -181,49 +200,61 @@ func run() {
 		dtUpdateSt := time.Now()
 		camera.Update()
 		camMat := camera.GetMatrix()
+		mousePos := camMat.Unproject(win.MousePosition())
 
 		walls := world.GetColliders(hero.AbsCollider())
 		hero.Update(walls)
 		camera.Follow(hero.Pos)
 
-		mousePos := camMat.Unproject(win.MousePosition())
-		// gun
-		origin := hero.Pos
-		gunDir := mousePos.Sub(origin).Unit()
-		gunStart := origin.Add(gunDir.Scaled(6))
-		gunEnd := origin.Add(gunDir.Scaled(12))
-
-		arrow.Update()
-		if win.JustPressed(pixelgl.MouseButton1) && !arrow.Active {
-			arrow.Spawn(hero.Pos, mousePos, hero.velocity.Scaled(0.2))
+		// bow
+		{
+			dir := mousePos.Sub(hero.Pos).Unit()
+			bow.Pos = hero.Pos.Add(dir.Scaled(4))
+			bow.Angle = dir.Angle()
 		}
 
+		// arrows
+		for _, a := range arrows {
+			if a.Active {
+				a.Update()
+			}
+		}
+
+		if arrowInHand == nil && engine.elapsed > nextArrowTime {
+			// Spawn the arrow, but do not let it fly
+			free := firstFreeArrow(arrows)
+			if free != -1 {
+				arrows[free].Spawn()
+				arrowInHand = arrows[free]
+			}
+		}
+
+		if win.JustPressed(pixelgl.MouseButton1) && arrowInHand != nil {
+			arrowInHand.Fly(hero.Pos, mousePos, hero.velocity.Scaled(0.22))
+			arrowInHand = nil
+			nextArrowTime = nextArrow(engine.elapsed)
+		}
+
+		if arrowInHand != nil {
+			arrowInHand.SyncWith(hero.Pos, mousePos)
+		}
+
+		// slimes
 		for i := range slimes {
 			if slimes[i].Active {
-				slimes[i].Update(hero, arrow)
+				slimes[i].Update(hero, arrows)
 			}
 		}
 
-		select {
-		case <-slimeTicker:
-			// spawn new slime
-			if activeSlimes >= len(slimes) {
-				break
+		if engine.elapsed > nextSlimeTime {
+			free := firstFreeSlime(slimes)
+			if free != -1 {
+				slimes[free].Spawn()
+				nextSlimeTime = nextSlime(engine.elapsed)
 			}
-			free := -1
-			for i := range slimes {
-				if !slimes[i].Active {
-					free = i
-					break
-				}
-			}
-			if free == -1 {
-				break
-			}
-			slimes[free].Spawn()
-		default:
 		}
 
+		// debug text
 		mPosTxt.Clear()
 		// fmt.Fprintf(mPosTxt, "mpos: %6.3f %6.3f\n", mousePos.X, mousePos.Y)
 		// fmt.Fprintf(mPosTxt, "hpos: %6.3f %6.3f\n", hero.Pos.X, hero.Pos.Y)
@@ -250,21 +281,17 @@ func run() {
 		// tileset batch
 		batch.Clear()
 		world.Draw(batch)
-		if arrow != nil {
-			arrow.Draw(batch)
-		}
 		hero.Draw(batch)
-		for i := range slimes {
-			slimes[i].Draw(batch)
+		bow.Draw(batch)
+		for _, a := range arrows {
+			a.Draw(batch)
+		}
+		for _, s := range slimes {
+			s.Draw(batch)
 		}
 		batch.Draw(win)
 
-		// debug
 		imd.Clear()
-		imd.Color = colornames.Whitesmoke
-		imd.Push(gunStart, gunEnd)
-		imd.Line(2)
-
 		imd.Color = colornames.Blueviolet
 		//drawRect(imd, hero.Collider.Moved(origin))
 		imd.Draw(win)
