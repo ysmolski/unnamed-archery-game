@@ -17,6 +17,8 @@ type Arrow struct {
 	flying       bool
 }
 
+const ArrowStart = 10.0
+
 func NewArrow(spr *pixel.Sprite) *Arrow {
 	a := &Arrow{Entity: *NewEntity(spr, pixel.ZV)}
 	a.Deactivate()
@@ -55,7 +57,7 @@ func (a *Arrow) Spawn() {
 
 func (a *Arrow) SyncWith(from, to pixel.Vec) {
 	dir := to.Sub(from).Unit()
-	a.Pos = from.Add(dir.Scaled(6))
+	a.Pos = from.Add(dir.Scaled(ArrowStart))
 	a.Angle = dir.Angle()
 	a.ScaleXY.X = 1.0
 	a.ScaleXY.Y = 1.0
@@ -64,7 +66,7 @@ func (a *Arrow) SyncWith(from, to pixel.Vec) {
 func (a *Arrow) Fly(from, to, relational pixel.Vec) {
 	a.flying = true
 	dir := to.Sub(from).Unit()
-	a.Pos = from.Add(dir.Scaled(6))
+	a.Pos = from.Add(dir.Scaled(ArrowStart))
 	a.Angle = dir.Angle()
 	a.vel = dir.Scaled(150).Add(relational)
 	a.target = to
@@ -84,7 +86,12 @@ func (a *Arrow) Update() {
 	newDist := a.DistanceToTarget()
 	// Maximum scaling should depend on the a.distance.
 	// If we shot on short distance then arrow should not rise high to the air.
-	a.ScaleXY.X = 1.0 + size*a.maxHeight/100 - a.maxHeight/150
+	perspect := a.maxHeight / 150
+	if newDist < a.halfDistance {
+		// make size smaller close to the target since arrow drops to the floow
+		perspect += (a.halfDistance - newDist) / a.halfDistance / 5
+	}
+	a.ScaleXY.X = 1.0 + size*a.maxHeight/100 - perspect
 	a.ScaleXY.Y = 1.0 + size*a.maxHeight/100
 	//fmt.Printf("%4.2f %4.2f\n", size, a.ScaleXY.X)
 	if newDist > oldDist {

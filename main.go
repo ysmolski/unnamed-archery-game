@@ -209,7 +209,7 @@ func run() {
 		// bow
 		{
 			dir := mousePos.Sub(hero.Pos).Unit()
-			bow.Pos = hero.Pos.Add(dir.Scaled(4))
+			bow.Pos = hero.Pos.Add(dir.Scaled(ArrowStart - 3))
 			bow.Angle = dir.Angle()
 		}
 
@@ -281,11 +281,11 @@ func run() {
 		// tileset batch
 		batch.Clear()
 		world.Draw(batch)
-		hero.Draw(batch)
 		bow.Draw(batch)
 		for _, a := range arrows {
 			a.Draw(batch)
 		}
+		hero.Draw(batch)
 		for _, s := range slimes {
 			s.Draw(batch)
 		}
