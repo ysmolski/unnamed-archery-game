@@ -56,7 +56,7 @@ func (h *Hero) Update(walls []pixel.Rect) {
 	} else if engine.win.Pressed(pixelgl.KeyD) {
 		dx = +daccel
 	} else {
-		// TODO: handle deceleration correctly, don't let it oscilate around 0.
+		// handle deceleration correctly, don't let it oscilate around 0.
 		if h.velocity.X >= daccel {
 			dx = -daccel
 		} else if h.velocity.X <= -daccel {

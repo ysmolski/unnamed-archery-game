@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/faiface/pixel/pixelgl"
@@ -14,8 +13,8 @@ type Engine struct {
 	dt               float64
 	win              *pixelgl.Window
 	winCfg           *pixelgl.WindowConfig
-	fpsCounter       int
-	fpsTicker        <-chan time.Time
+	// fpsCounter       int
+	// fpsTicker        <-chan time.Time
 }
 
 func NewEngine(cfg *pixelgl.WindowConfig) *Engine {
@@ -29,18 +28,10 @@ func NewEngine(cfg *pixelgl.WindowConfig) *Engine {
 		started:          time.Now(),
 		win:              win,
 		winCfg:           cfg,
-		fpsTicker:        time.Tick(time.Second),
 		prevFrameStarted: time.Now(),
 	}
 }
 
 func (e *Engine) fpsHandler() {
 	e.elapsed = time.Since(e.started).Seconds()
-	e.fpsCounter++
-	select {
-	case <-e.fpsTicker:
-		e.win.SetTitle(fmt.Sprintf("%s | fps: %d", e.winCfg.Title, e.fpsCounter))
-		e.fpsCounter = 0
-	default:
-	}
 }

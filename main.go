@@ -98,9 +98,10 @@ func run() {
 	cfg := pixelgl.WindowConfig{
 		Title:  "A World",
 		Bounds: pixel.R(0, 0, 1400, 800),
-		VSync:  false,
+		VSync:  true,
 	}
 	engine = NewEngine(&cfg)
+	engine.win.SetMonitor(pixelgl.PrimaryMonitor())
 
 	trid := &pixel.TrianglesData{}
 	batch := pixel.NewBatch(trid, tileset)
@@ -131,9 +132,9 @@ func run() {
 	spr := pixel.NewSprite(tileset, frames[1])
 	hero := NewHero(
 		spr,
-		pixel.V(200, 100),
+		pixel.V(48, 100),
 		100,
-		800,
+		400,
 	)
 	r := pixel.R(-spr.Frame().W()/2.5, -spr.Frame().H()/2.5, spr.Frame().W()/2.5, spr.Frame().H()/3)
 	hero.Collider = &r
@@ -157,10 +158,10 @@ func run() {
 	}
 	nextSlime := TimeScheduler(5.0, 0.02)
 
-	targetFrameTime := 8000 * time.Microsecond
+	targetFrameTime := 16200 * time.Microsecond
 	gcOnFrame := 120
 	gcFrame := 0
-	var gcTime time.Duration
+	// var gcTime time.Duration
 
 	var (
 		dtMax       float64
@@ -182,24 +183,31 @@ func run() {
 			// I get stuttering when something runs in background. Is it related to
 			// GC or just a problem of slow hardware?
 			// When I do not invoke GC manually I get many slow frames.
-			gcSt := time.Now()
-			runtime.GC()
-			gcTime = time.Since(gcSt)
+			// gcSt := time.Now()
+			// runtime.GC()
+			// gcTime = time.Since(gcSt)
 			gcFrame = 0
 			dtMax = 0
 			dtUpdateMax = 0
 			dtDrawMax = 0
 		}
 		for time.Since(engine.prevFrameStarted) < targetFrameTime {
-			time.Sleep(200 * time.Microsecond)
+			time.Sleep(100 * time.Microsecond)
 		}
 		engine.dt = time.Since(engine.prevFrameStarted).Seconds()
 		engine.prevFrameStarted = time.Now()
 		if engine.dt > dtMax {
 			dtMax = engine.dt
 		}
-
 		dtUpdateSt := time.Now()
+		if win.JustPressed(pixelgl.KeyF) {
+			if engine.win.Monitor() == nil {
+				engine.win.SetMonitor(pixelgl.PrimaryMonitor())
+			} else {
+				engine.win.SetMonitor(nil)
+			}
+		}
+
 		camera.Update()
 		camMat := camera.GetMatrix()
 		mousePos := camMat.Unproject(win.MousePosition())
@@ -269,11 +277,11 @@ func run() {
 		// fmt.Fprintf(mPosTxt, "hpos: %6.3f %6.3f\n", hero.Pos.X, hero.Pos.Y)
 		// fmt.Fprintf(mPosTxt, "hvel: %6.3f %6.3f %6.3f\n", hero.velocity.X, hero.velocity.Y, hero.velocity.Len())
 		// fmt.Fprintf(mPosTxt, "health: %6.1f\n", hero.health)
+		fmt.Fprintf(mPosTxt, "   fps: %3.0d\n", int(1/engine.dt))
 		fmt.Fprintf(mPosTxt, "cur dt: %6.5f\n", engine.dt)
 		fmt.Fprintf(mPosTxt, "max dt: %6.5f\n", dtMax)
 		fmt.Fprintf(mPosTxt, "dt upd: %6.5f\n", dtUpdateMax)
 		fmt.Fprintf(mPosTxt, "dt dra: %6.5f\n", dtDrawMax)
-		fmt.Fprintf(mPosTxt, "gc: %7d\n", gcTime.Nanoseconds())
 
 		dtUpdate = time.Since(dtUpdateSt).Seconds()
 		if dtUpdate > dtUpdateMax {
@@ -309,8 +317,8 @@ func run() {
 		win.SetMatrix(pixel.IM)
 		mPosTxt.Draw(win, pixel.IM.Scaled(mPosTxt.Orig, 1))
 
-		win.Update()
 		engine.fpsHandler()
+		win.Update()
 
 		dtDraw = time.Since(dtDrawSt).Seconds()
 		if dtDraw > dtDrawMax {
