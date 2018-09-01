@@ -1,9 +1,9 @@
-* implement stuck arrows into the ground
-* spawn slimes at some distance from the hero, preferrable in location without slimes
-* slimes should not intersect with player
+* DONE implement stuck arrows into the ground
+* DONE spawn slimes at some distance from the hero, preferrable in location without slimes
+* DONE slimes should not intersect with player
+* make gameover screen
 * make nice progression of difficulty
 * enemies should become faster and meaner
-* make gameover screen
 * make press to start screen
 * figure out why drawing creates so many objects here: github.com/faiface/pixel.(*TrianglesData).Slice
 

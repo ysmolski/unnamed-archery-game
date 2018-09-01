@@ -69,6 +69,7 @@ func TimeScheduler(init, rate float64) func(float64) float64 {
 var (
 	engine *Engine
 	world  *World
+	hero   *Hero
 )
 
 var (
@@ -130,7 +131,7 @@ func run() {
 	world = NewWorld(40, 25, sSize, sprWall, sprBG, batchBg)
 
 	spr := pixel.NewSprite(tileset, frames[1])
-	hero := NewHero(
+	hero = NewHero(
 		spr,
 		pixel.V(48, 100),
 		100,
@@ -158,7 +159,7 @@ func run() {
 	}
 	nextSlime := TimeScheduler(5.0, 0.02)
 
-	targetFrameTime := 16200 * time.Microsecond
+	targetFrameTime := 16400 * time.Microsecond
 	gcOnFrame := 120
 	gcFrame := 0
 	// var gcTime time.Duration
@@ -212,8 +213,7 @@ func run() {
 		camMat := camera.GetMatrix()
 		mousePos := camMat.Unproject(win.MousePosition())
 
-		walls := world.GetColliders(hero.AbsCollider())
-		hero.Update(walls)
+		hero.Update()
 
 		// bow
 		{
@@ -259,7 +259,7 @@ func run() {
 		// slimes
 		for i := range slimes {
 			if slimes[i].Active {
-				slimes[i].Update(hero, arrows)
+				slimes[i].Update(arrows)
 			}
 		}
 
@@ -298,14 +298,21 @@ func run() {
 		// tileset batch
 		batch.Clear()
 		world.Draw(batch)
-		bow.Draw(batch)
 		for _, a := range arrows {
-			a.Draw(batch)
+			if a.State == ArrowStuck {
+				a.Draw(batch)
+			}
 		}
-		hero.Draw(batch)
 		for _, s := range slimes {
 			s.Draw(batch)
 		}
+		bow.Draw(batch)
+		for _, a := range arrows {
+			if a.State != ArrowStuck {
+				a.Draw(batch)
+			}
+		}
+		hero.Draw(batch)
 		batch.Draw(win)
 
 		imd.Clear()

@@ -29,11 +29,11 @@ func (h *Hero) Damage(health float64) {
 	h.health += health
 }
 
-func (h *Hero) SlowDown() {
-	h.velocity = h.velocity.Scaled(0.8)
+func (h *Hero) SlowDown(rate float64) {
+	h.velocity = h.velocity.Scaled(rate)
 }
 
-func (h *Hero) Update(walls []pixel.Rect) {
+func (h *Hero) Update() {
 	pct := h.health / h.maxHealth * 100
 	switch {
 	case pct >= 80:
@@ -90,7 +90,9 @@ func (h *Hero) Update(walls []pixel.Rect) {
 	}
 
 	delta := h.velocity.Scaled(engine.dt)
+
 	colWorld := h.AbsCollider()
+	walls := world.GetColliders(colWorld)
 	c := colWorld.Moved(delta)
 	for _, wall := range walls {
 		if Collides(c, wall) {
