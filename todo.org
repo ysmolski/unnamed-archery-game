@@ -1,10 +1,10 @@
 * DONE implement stuck arrows into the ground
 * DONE spawn slimes at some distance from the hero, preferrable in location without slimes
 * DONE slimes should not intersect with player
-* make gameover screen
+* DONE make gameover screen
+* DONE count scores
 * make arrows of finite amount + make collectable arrows
-* count scores
-
+* make old corpses of slimes dissapear
 * add collectables (additional arrows, temporary speed, double strike?)
 * make nice progression of difficulty
 * enemies should become faster and meaner

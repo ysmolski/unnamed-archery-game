@@ -26,11 +26,17 @@ func NewHero(s *pixel.Sprite, pos pixel.Vec, maxVel, accel float64) *Hero {
 }
 
 func (h *Hero) Damage(health float64) {
-	h.health += health
+	if h.Alive() {
+		h.health = pixel.Clamp(h.health+health, 0, h.maxHealth)
+	}
 }
 
 func (h *Hero) SlowDown(rate float64) {
 	h.velocity = h.velocity.Scaled(rate)
+}
+
+func (h *Hero) Alive() bool {
+	return h.health > 0
 }
 
 func (h *Hero) Update() {
@@ -38,14 +44,20 @@ func (h *Hero) Update() {
 	switch {
 	case pct >= 80:
 		h.Color = colornames.White
-	case pct >= 50:
+	case pct >= 60:
 		h.Color = colornames.Peachpuff
-	case pct >= 25:
+	case pct >= 45:
 		h.Color = colornames.Rosybrown
-	case pct > 15:
+	case pct >= 30:
 		h.Color = colornames.Brown
-	case pct <= 0:
+	case pct >= 10:
 		h.Color = colornames.Red
+	default:
+		h.Color = colornames.Purple
+	}
+
+	if !h.Alive() {
+		return
 	}
 
 	daccel := h.accel * engine.dt

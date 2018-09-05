@@ -14,6 +14,7 @@ type Slime struct {
 	rotation       float64
 	fixedDirection pixel.Vec
 	fixed          bool
+	Alive          bool
 }
 
 func NewSlime(spr *pixel.Sprite) *Slime {
@@ -27,25 +28,36 @@ func NewSlime(spr *pixel.Sprite) *Slime {
 	sl.drainRate = 120
 	sl.Active = false
 	sl.Visible = false
+	sl.Alive = false
 	return sl
 }
 
 func (s *Slime) Spawn() {
 	p := world.RandomVec()
-	for hero.Pos.Sub(p).Len() < 64 {
+	for hero.Pos.Sub(p).Len() < 102 {
 		p = world.RandomVec()
 	}
 	s.Pos = p
 	s.rotation = rand.Float64() + 0.2
-	s.speed = s.rotation*40 + 30 + engine.elapsed/10
+	s.speed = s.rotation*40 + 30 + engine.elapsed/5
 	// s.speed /= 1000
 	s.Active = true
 	s.Visible = true
+	s.Alive = true
+}
+
+func (s *Slime) Kill() {
+	s.Alive = false
+	s.Color = colornames.Pink
 }
 
 func (s *Slime) Update(arrows []*Arrow) {
 	// Slimes should "see" the player and fly to touch the player.
 	// TODO: Implement spiralled movement.
+	if !s.Alive || !s.Active {
+		return
+	}
+
 	var dir pixel.Vec
 	dir = hero.Pos.Sub(s.Pos).Unit()
 	if s.fixed {
@@ -96,8 +108,9 @@ func (s *Slime) Update(arrows []*Arrow) {
 
 	for _, arrow := range arrows {
 		if arrow.Kills(wcol) {
-			s.Deactivate()
+			s.Kill()
 			arrow.Stick()
+			break
 		}
 	}
 }

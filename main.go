@@ -102,7 +102,7 @@ func run() {
 		VSync:  *vsync,
 	}
 	engine = NewEngine(&cfg)
-	engine.win.SetMonitor(pixelgl.PrimaryMonitor())
+	// engine.win.SetMonitor(pixelgl.PrimaryMonitor())
 
 	trid := &pixel.TrianglesData{}
 	batch := pixel.NewBatch(trid, tileset)
@@ -119,7 +119,9 @@ func run() {
 
 	// font
 	atlas := text.NewAtlas(basicfont.Face7x13, text.ASCII)
-	mPosTxt := text.New(pixel.V(8, engine.win.Bounds().Max.Y-16), atlas)
+	debugText := text.New(pixel.V(8, engine.win.Bounds().Max.Y-16), atlas)
+	lostText := text.New(engine.win.Bounds().Center(), atlas)
+	scoreText := text.New(engine.win.Bounds().Max.Add(pixel.V(-236, -36)), atlas)
 
 	sprWall := pixel.NewSprite(tileset, frames[256-37])
 	var sprBG []*pixel.Sprite
@@ -134,7 +136,7 @@ func run() {
 	hero = NewHero(
 		spr,
 		pixel.V(48, 100),
-		100,
+		90,
 		400,
 	)
 	r := pixel.R(-spr.Frame().W()/2.5, -spr.Frame().H()/2.5, spr.Frame().W()/2.5, spr.Frame().H()/3)
@@ -146,18 +148,21 @@ func run() {
 
 	sprArrow := pixel.NewSprite(tileset, frames[26])
 	sprStuckArrow := pixel.NewSprite(tileset, frames[27])
-	arrows := make([]*Arrow, 100)
+	arrows := make([]*Arrow, 20)
 	for i := range arrows {
 		arrows[i] = NewArrow(sprArrow, sprStuckArrow)
 	}
-	nextArrow := TimeScheduler(1.5, 0.02)
+	nextArrow := TimeScheduler(1.5, 0.001)
+	// Position in arrows which we should despawn of all arrows slots are taken.
+	arrowRecycle := 0
 
 	sprSlime := pixel.NewSprite(tileset, frames[15])
-	slimes := make([]*Slime, 100)
+	slimes := make([]*Slime, 200)
 	for i := range slimes {
 		slimes[i] = NewSlime(sprSlime)
 	}
-	nextSlime := TimeScheduler(5.0, 0.02)
+	nextSlime := TimeScheduler(5.0, 0.01)
+	slimeRecycle := 0
 
 	targetFrameTime := 16500 * time.Microsecond
 	gcOnFrame := 160
@@ -175,6 +180,9 @@ func run() {
 	nextSlimeTime := nextSlime(engine.elapsed)
 	nextArrowTime := nextArrow(engine.elapsed)
 	var arrowInHand *Arrow
+
+	gameOver := false
+	gameScore := 0
 
 	win := engine.win
 	// prewarm input
@@ -221,19 +229,19 @@ func run() {
 		hero.Update()
 
 		// bow
-		{
+		if hero.Alive() {
 			dir := mousePos.Sub(hero.Pos).Unit()
 			bow.Pos = hero.Pos.Add(dir.Scaled(ArrowStartDistance - 3))
 			bow.Angle = dir.Angle()
-		}
 
-		lookAt := hero.Pos.Add(
-			mousePos.
-				Sub(hero.Pos).
-				Unit().
-				Scaled(64))
-		lookAt = lookAt.Add(hero.velocity.Scaled(0.64))
-		camera.Follow(lookAt)
+			lookAt := hero.Pos.Add(
+				mousePos.
+					Sub(hero.Pos).
+					Unit().
+					Scaled(64))
+			lookAt = lookAt.Add(hero.velocity.Scaled(0.64))
+			camera.Follow(lookAt)
+		}
 
 		// arrows
 		for _, a := range arrows {
@@ -245,48 +253,71 @@ func run() {
 		if arrowInHand == nil && engine.elapsed > nextArrowTime {
 			// Spawn the arrow, but do not let it fly
 			free := firstFreeArrow(arrows)
-			if free != -1 {
-				arrows[free].Spawn()
-				arrowInHand = arrows[free]
+			if free == -1 {
+				free = arrowRecycle
+				arrowRecycle++
+				if arrowRecycle >= len(arrows) {
+					arrowRecycle = 0
+				}
 			}
+			arrows[free].Spawn()
+			arrowInHand = arrows[free]
 		}
 
-		if win.JustPressed(pixelgl.MouseButton1) && arrowInHand != nil {
+		if hero.Alive() && win.JustPressed(pixelgl.MouseButton1) && arrowInHand != nil {
 			arrowInHand.Fly(hero.Pos, mousePos, hero.velocity.Scaled(0.22))
 			arrowInHand = nil
 			nextArrowTime = nextArrow(engine.elapsed)
 		}
 
-		if arrowInHand != nil {
+		if hero.Alive() && arrowInHand != nil {
 			arrowInHand.SyncWith(hero.Pos, mousePos)
 		}
 
 		// slimes
 		for i := range slimes {
 			if slimes[i].Active {
-				slimes[i].Update(arrows)
+				s := slimes[i]
+				aliveBefore := s.Alive
+				s.Update(arrows)
+				if aliveBefore && !s.Alive {
+					gameScore += int(math.Round(s.Pos.Sub(hero.Pos).Len() * (1 + engine.elapsed/1000)))
+				}
 			}
 		}
 
 		if engine.elapsed > nextSlimeTime {
 			free := firstFreeSlime(slimes)
-			if free != -1 {
-				slimes[free].Spawn()
-				nextSlimeTime = nextSlime(engine.elapsed)
+			if free == -1 {
+				free = slimeRecycle
+				slimeRecycle++
+				if slimeRecycle >= len(slimes) {
+					slimeRecycle = 0
+				}
 			}
+			slimes[free].Spawn()
+			nextSlimeTime = nextSlime(engine.elapsed)
 		}
 
+		if !gameOver && !hero.Alive() {
+			gameOver = true
+			lostText.Clear()
+			fmt.Fprint(lostText, "Game Over!\nPress Esc to exit")
+		}
+		scoreText.Clear()
+		fmt.Fprintf(scoreText, "Game score: %d", gameScore)
+
 		// debug text
-		mPosTxt.Clear()
+		debugText.Clear()
 		// fmt.Fprintf(mPosTxt, "mpos: %6.3f %6.3f\n", mousePos.X, mousePos.Y)
 		// fmt.Fprintf(mPosTxt, "hpos: %6.3f %6.3f\n", hero.Pos.X, hero.Pos.Y)
 		// fmt.Fprintf(mPosTxt, "hvel: %6.3f %6.3f %6.3f\n", hero.velocity.X, hero.velocity.Y, hero.velocity.Len())
 		// fmt.Fprintf(mPosTxt, "health: %6.1f\n", hero.health)
-		fmt.Fprintf(mPosTxt, "   fps: %3.0d\n", int(math.Round(1.0/engine.dt)))
-		fmt.Fprintf(mPosTxt, "cur dt: %6.5f\n", engine.dt)
-		fmt.Fprintf(mPosTxt, "max dt: %6.5f\n", dtMax)
-		fmt.Fprintf(mPosTxt, "dt upd: %6.5f\n", dtUpdateMax)
-		fmt.Fprintf(mPosTxt, "dt dra: %6.5f\n", dtDrawMax)
+		fmt.Fprintf(debugText, "   fps: %3.0d\n", int(math.Round(1.0/engine.dt)))
+		fmt.Fprintf(debugText, "cur dt: %6.5f\n", engine.dt)
+		fmt.Fprintf(debugText, "max dt: %6.5f\n", dtMax)
+		fmt.Fprintf(debugText, "dt upd: %6.5f\n", dtUpdateMax)
+		fmt.Fprintf(debugText, "dt dra: %6.5f\n", dtDrawMax)
 
 		dtUpdate = time.Since(dtUpdateSt).Seconds()
 		if dtUpdate > dtUpdateMax {
@@ -303,13 +334,20 @@ func run() {
 		// tileset batch
 		batch.Clear()
 		world.Draw(batch)
+		for i := range slimes {
+			if !slimes[i].Alive {
+				slimes[i].Draw(batch)
+			}
+		}
 		for _, a := range arrows {
 			if a.State == ArrowStuck {
 				a.Draw(batch)
 			}
 		}
-		for _, s := range slimes {
-			s.Draw(batch)
+		for i := range slimes {
+			if slimes[i].Alive {
+				slimes[i].Draw(batch)
+			}
 		}
 		bow.Draw(batch)
 		for _, a := range arrows {
@@ -327,7 +365,12 @@ func run() {
 
 		// debug text
 		win.SetMatrix(pixel.IM)
-		mPosTxt.Draw(win, pixel.IM.Scaled(mPosTxt.Orig, 1))
+		debugText.Draw(win, pixel.IM.Scaled(debugText.Orig, 1))
+		if !hero.Alive() {
+			lostText.DrawColorMask(win, pixel.IM.Scaled(lostText.Bounds().Center(), 6), colornames.Black)
+			lostText.DrawColorMask(win, pixel.IM.Scaled(lostText.Bounds().Center(), 6).Moved(pixel.V(-4, 6)), colornames.White)
+		}
+		scoreText.Draw(win, pixel.IM.Scaled(scoreText.Orig, 2))
 
 		engine.fpsHandler()
 		win.Update()
