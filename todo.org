@@ -2,8 +2,12 @@
 * DONE spawn slimes at some distance from the hero, preferrable in location without slimes
 * DONE slimes should not intersect with player
 * make gameover screen
+* make arrows of finite amount + make collectable arrows
+* count scores
+
+* add collectables (additional arrows, temporary speed, double strike?)
 * make nice progression of difficulty
 * enemies should become faster and meaner
-* make press to start screen
+* add "press to start screen"
 * figure out why drawing creates so many objects here: github.com/faiface/pixel.(*TrianglesData).Slice
 

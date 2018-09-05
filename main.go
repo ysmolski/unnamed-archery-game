@@ -99,7 +99,7 @@ func run() {
 	cfg := pixelgl.WindowConfig{
 		Title:  "A World",
 		Bounds: pixel.R(0, 0, 1400, 800),
-		VSync:  true,
+		VSync:  *vsync,
 	}
 	engine = NewEngine(&cfg)
 	engine.win.SetMonitor(pixelgl.PrimaryMonitor())
@@ -159,8 +159,8 @@ func run() {
 	}
 	nextSlime := TimeScheduler(5.0, 0.02)
 
-	targetFrameTime := 16400 * time.Microsecond
-	gcOnFrame := 120
+	targetFrameTime := 16500 * time.Microsecond
+	gcOnFrame := 160
 	gcFrame := 0
 	// var gcTime time.Duration
 
@@ -177,29 +177,31 @@ func run() {
 	var arrowInHand *Arrow
 
 	win := engine.win
-	for !win.Closed() {
-		gcFrame++
-		if gcFrame >= gcOnFrame {
-			// When I run this game on machine with 2 cores CPU,
-			// I get stuttering when something runs in background. Is it related to
-			// GC or just a problem of slow hardware?
-			// When I do not invoke GC manually I get many slow frames.
-			// gcSt := time.Now()
-			// runtime.GC()
-			// gcTime = time.Since(gcSt)
-			gcFrame = 0
-			dtMax = 0
-			dtUpdateMax = 0
-			dtDrawMax = 0
-		}
+	// prewarm input
+	for i := 0; i < 2; i++ {
+		engine.fpsHandler()
+		win.UpdateInput()
+		win.Update()
+	}
+
+	for {
 		for time.Since(engine.prevFrameStarted) < targetFrameTime {
-			time.Sleep(100 * time.Microsecond)
+			time.Sleep(10 * time.Microsecond)
 		}
 		engine.dt = time.Since(engine.prevFrameStarted).Seconds()
 		engine.prevFrameStarted = time.Now()
 		if engine.dt > dtMax {
 			dtMax = engine.dt
 		}
+
+		gcFrame++
+		if gcFrame >= gcOnFrame {
+			gcFrame = 0
+			dtMax = 0
+			dtUpdateMax = 0
+			dtDrawMax = 0
+		}
+
 		dtUpdateSt := time.Now()
 		if win.JustPressed(pixelgl.KeyF) {
 			if engine.win.Monitor() == nil {
@@ -207,6 +209,9 @@ func run() {
 			} else {
 				engine.win.SetMonitor(nil)
 			}
+		}
+		if win.Pressed(pixelgl.KeyEscape) {
+			return
 		}
 
 		camera.Update()
@@ -277,7 +282,7 @@ func run() {
 		// fmt.Fprintf(mPosTxt, "hpos: %6.3f %6.3f\n", hero.Pos.X, hero.Pos.Y)
 		// fmt.Fprintf(mPosTxt, "hvel: %6.3f %6.3f %6.3f\n", hero.velocity.X, hero.velocity.Y, hero.velocity.Len())
 		// fmt.Fprintf(mPosTxt, "health: %6.1f\n", hero.health)
-		fmt.Fprintf(mPosTxt, "   fps: %3.0d\n", int(1/engine.dt))
+		fmt.Fprintf(mPosTxt, "   fps: %3.0d\n", int(math.Round(1.0/engine.dt)))
 		fmt.Fprintf(mPosTxt, "cur dt: %6.5f\n", engine.dt)
 		fmt.Fprintf(mPosTxt, "max dt: %6.5f\n", dtMax)
 		fmt.Fprintf(mPosTxt, "dt upd: %6.5f\n", dtUpdateMax)
@@ -334,9 +339,13 @@ func run() {
 	}
 }
 
-var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
-var memprofile = flag.String("memprofile", "", "write memory profile to `file`")
-var traceprofile = flag.String("traceprofile", "", "write trace profile to file")
+var vsync = flag.Bool("vsync", false, "use vsync")
+
+var (
+	cpuprofile   = flag.String("cpuprofile", "", "write cpu profile to file")
+	memprofile   = flag.String("memprofile", "", "write memory profile to `file`")
+	traceprofile = flag.String("traceprofile", "", "write trace profile to file")
+)
 
 func main() {
 	if *memprofile != "" {
