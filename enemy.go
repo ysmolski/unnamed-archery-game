@@ -48,7 +48,7 @@ func (s *Slime) Spawn() {
 
 func (s *Slime) Kill() {
 	s.Alive = false
-	s.Color = colornames.Pink
+	s.Color = colornames.Grey
 }
 
 func (s *Slime) Update(arrows []*Arrow) {

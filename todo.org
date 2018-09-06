@@ -4,7 +4,8 @@
 * DONE make gameover screen
 * DONE count scores
 * DONE make old corpses of slimes dissapear
-* make arrows of finite amount + make collectable arrows
+* DONE make arrows of finite amount + make collectable arrows
+
 
 * add collectables (additional arrows, temporary speed, double strike?)
 * figure out why drawing creates so many objects here: github.com/faiface/pixel.(*TrianglesData).Slice
