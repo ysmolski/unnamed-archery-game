@@ -3,11 +3,9 @@
 * DONE slimes should not intersect with player
 * DONE make gameover screen
 * DONE count scores
+* DONE make old corpses of slimes dissapear
 * make arrows of finite amount + make collectable arrows
-* make old corpses of slimes dissapear
+
 * add collectables (additional arrows, temporary speed, double strike?)
-* make nice progression of difficulty
-* enemies should become faster and meaner
-* add "press to start screen"
 * figure out why drawing creates so many objects here: github.com/faiface/pixel.(*TrianglesData).Slice
 

@@ -148,20 +148,25 @@ func run() {
 
 	sprArrow := pixel.NewSprite(tileset, frames[26])
 	sprStuckArrow := pixel.NewSprite(tileset, frames[27])
-	arrows := make([]*Arrow, 20)
+	arrows := make([]*Arrow, 3)
 	for i := range arrows {
 		arrows[i] = NewArrow(sprArrow, sprStuckArrow)
 	}
-	nextArrow := TimeScheduler(1.5, 0.001)
-	// Position in arrows which we should despawn of all arrows slots are taken.
-	arrowRecycle := 0
+	for i := range arrows {
+		arrows[i].ToQuiver()
+	}
+	arrowsQ := make([]*Arrow, 0, 3)
+	arrowsQ = append(arrowsQ, arrows...)
+	var arrowInHand *Arrow
+	timeToDrawArrow := 1.0
+	drawArrowDone := engine.elapsed + timeToDrawArrow
 
 	sprSlime := pixel.NewSprite(tileset, frames[15])
 	slimes := make([]*Slime, 200)
 	for i := range slimes {
 		slimes[i] = NewSlime(sprSlime)
 	}
-	nextSlime := TimeScheduler(5.0, 0.01)
+	nextSlime := TimeScheduler(8.0, 0.01)
 	slimeRecycle := 0
 
 	targetFrameTime := 16500 * time.Microsecond
@@ -178,8 +183,6 @@ func run() {
 	)
 
 	nextSlimeTime := nextSlime(engine.elapsed)
-	nextArrowTime := nextArrow(engine.elapsed)
-	var arrowInHand *Arrow
 
 	gameOver := false
 	gameScore := 0
@@ -230,15 +233,14 @@ func run() {
 
 		// bow
 		if hero.Alive() {
-			dir := mousePos.Sub(hero.Pos).Unit()
+			lookVec := mousePos.Sub(hero.Pos)
+			dir := lookVec.Unit()
 			bow.Pos = hero.Pos.Add(dir.Scaled(ArrowStartDistance - 3))
 			bow.Angle = dir.Angle()
 
+			lookDistance := pixel.Clamp(lookVec.Len(), 0, 64)
 			lookAt := hero.Pos.Add(
-				mousePos.
-					Sub(hero.Pos).
-					Unit().
-					Scaled(64))
+				lookVec.Unit().Scaled(lookDistance))
 			lookAt = lookAt.Add(hero.velocity.Scaled(0.64))
 			camera.Follow(lookAt)
 		}
@@ -250,28 +252,47 @@ func run() {
 			}
 		}
 
-		if arrowInHand == nil && engine.elapsed > nextArrowTime {
-			// Spawn the arrow, but do not let it fly
-			free := firstFreeArrow(arrows)
-			if free == -1 {
-				free = arrowRecycle
-				arrowRecycle++
-				if arrowRecycle >= len(arrows) {
-					arrowRecycle = 0
+		if arrowInHand == nil && engine.elapsed > drawArrowDone {
+			// Move arrow from the quiver to hands.
+			if len(arrowsQ) > 0 {
+				last := len(arrowsQ) - 1
+				arrowInHand = arrowsQ[last]
+				arrowsQ = arrowsQ[:last]
+				arrowInHand.ToHands()
+			}
+		}
+
+		if hero.Alive() {
+			if win.JustPressed(pixelgl.MouseButton1) && arrowInHand != nil {
+				arrowInHand.Fly(hero.Pos, mousePos, hero.velocity.Scaled(0.22))
+				arrowInHand = nil
+				if len(arrowsQ) > 0 {
+					drawArrowDone = engine.elapsed + timeToDrawArrow
 				}
 			}
-			arrows[free].Spawn()
-			arrowInHand = arrows[free]
-		}
 
-		if hero.Alive() && win.JustPressed(pixelgl.MouseButton1) && arrowInHand != nil {
-			arrowInHand.Fly(hero.Pos, mousePos, hero.velocity.Scaled(0.22))
-			arrowInHand = nil
-			nextArrowTime = nextArrow(engine.elapsed)
-		}
+			heroColBig := hero.AbsCollider()
+			quiverIdx := 0
+			for i := range arrows {
+				a := arrows[i]
+				if a.State == ArrowStuck {
+					if Collides(a.AbsCollider(), heroColBig) {
+						if len(arrowsQ) == 0 {
+							drawArrowDone = engine.elapsed + timeToDrawArrow
+						}
+						arrowsQ = append(arrowsQ, a)
+						a.ToQuiver()
+					}
+				}
 
-		if hero.Alive() && arrowInHand != nil {
-			arrowInHand.SyncWith(hero.Pos, mousePos)
+				if a.State == ArrowHands {
+					a.AttachToHands(hero.Pos, mousePos)
+				}
+				if a.State == ArrowQuiver {
+					a.AttachToQuiver(hero.Pos, quiverIdx)
+					quiverIdx++
+				}
+			}
 		}
 
 		// slimes

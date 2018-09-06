@@ -25,7 +25,8 @@ type ArrowState uint8
 
 const (
 	ArrowInactive ArrowState = iota
-	ArrowDraw
+	ArrowQuiver
+	ArrowHands
 	ArrowFlying
 	ArrowStuck
 )
@@ -60,18 +61,31 @@ func (a *Arrow) CurrentHeight() float64 {
 	return a.maxHeight * math.Sqrt(a.DistanceFromEnds())
 }
 
-func (a *Arrow) Spawn() {
+func (a *Arrow) ToHands() {
 	a.Active = true
 	a.Visible = true
-	a.State = ArrowDraw
+	a.State = ArrowHands
 }
 
-func (a *Arrow) SyncWith(from, to pixel.Vec) {
+func (a *Arrow) ToQuiver() {
+	a.Active = true
+	a.Visible = true
+	a.State = ArrowQuiver
+}
+
+func (a *Arrow) AttachToHands(from, to pixel.Vec) {
 	dir := to.Sub(from).Unit()
 	a.Pos = from.Add(dir.Scaled(ArrowStartDistance))
 	a.Angle = dir.Angle()
 	a.ScaleXY.X = 1.0
 	a.ScaleXY.Y = 1.0
+}
+
+func (a *Arrow) AttachToQuiver(pos pixel.Vec, idx int) {
+	a.Pos = pos.Add(pixel.V(-8+3*float64(idx), 7))
+	a.Angle = math.Pi / 2
+	a.ScaleXY.X = 0.5
+	a.ScaleXY.Y = 0.5
 }
 
 func (a *Arrow) Fly(from, to, relational pixel.Vec) {
