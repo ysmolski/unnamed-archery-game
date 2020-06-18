@@ -107,12 +107,12 @@ func (h *Hero) Update() {
 	walls := world.GetColliders(colWorld)
 	c := colWorld.Moved(delta)
 	for _, wall := range walls {
-		if Collides(c, wall) {
+		if collides(c, wall) {
 			// Try to zero movement on one of the axes and continue if there is no collision.
 			tdelta := delta
 			tdelta.Y = 0
 			c = colWorld.Moved(tdelta)
-			if !Collides(c, wall) {
+			if !collides(c, wall) {
 				h.velocity.Y = 0
 				delta = tdelta
 				continue
@@ -120,7 +120,7 @@ func (h *Hero) Update() {
 			tdelta = delta
 			tdelta.X = 0
 			c = colWorld.Moved(tdelta)
-			if !Collides(c, wall) {
+			if !collides(c, wall) {
 				h.velocity.X = 0
 				delta = tdelta
 				continue

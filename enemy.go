@@ -70,7 +70,7 @@ func (s *Slime) Update(arrows []*Arrow) {
 
 	wallCollided := false
 	wcol := s.AbsCollider()
-	if Collides(wcol, hero.AbsCollider()) {
+	if collides(wcol, hero.AbsCollider()) {
 		hero.Damage(-s.drainRate * engine.dt)
 		hero.SlowDown(0.7)
 	} else {
@@ -78,7 +78,7 @@ func (s *Slime) Update(arrows []*Arrow) {
 		walls := world.GetColliders(colWorld)
 		c := colWorld.Moved(delta)
 		for _, wall := range walls {
-			if Collides(c, wall) {
+			if collides(c, wall) {
 				s.Pos = s.Pos.Sub(delta)
 				wallCollided = true
 				if s.fixed {

@@ -46,7 +46,7 @@ func drawRect(imd *imdraw.IMDraw, r pixel.Rect) {
 	imd.Line(1)
 }
 
-func Collides(a, b pixel.Rect) bool {
+func collides(a, b pixel.Rect) bool {
 	x1 := math.Max(a.Min.X, b.Min.X)
 	y1 := math.Max(a.Min.Y, b.Min.Y)
 	x2 := math.Min(a.Max.X, b.Max.X)
@@ -58,7 +58,7 @@ func Collides(a, b pixel.Rect) bool {
 	return true
 }
 
-func TimeScheduler(init, rate float64) func(float64) float64 {
+func timeScheduler(init, rate float64) func(float64) float64 {
 	next := init
 	return func(t float64) float64 {
 		next := next - t*rate
@@ -166,7 +166,7 @@ func run() {
 	for i := range slimes {
 		slimes[i] = NewSlime(sprSlime)
 	}
-	nextSlime := TimeScheduler(8.0, 0.01)
+	nextSlime := timeScheduler(8.0, 0.01)
 	slimeRecycle := 0
 
 	targetFrameTime := 16500 * time.Microsecond
@@ -263,7 +263,8 @@ func run() {
 		}
 
 		if hero.Alive() {
-			if win.JustPressed(pixelgl.MouseButton1) && arrowInHand != nil {
+			shoot := (win.JustPressed(pixelgl.MouseButton1) || win.JustPressed(pixelgl.KeySpace))
+			if shoot && arrowInHand != nil {
 				arrowInHand.Fly(hero.Pos, mousePos, hero.velocity.Scaled(0.22))
 				arrowInHand = nil
 				if len(arrowsQ) > 0 {
@@ -276,7 +277,7 @@ func run() {
 			for i := range arrows {
 				a := arrows[i]
 				if a.State == ArrowStuck {
-					if Collides(a.AbsCollider(), heroColBig) {
+					if collides(a.AbsCollider(), heroColBig) {
 						if len(arrowsQ) == 0 {
 							drawArrowDone = engine.elapsed + timeToDrawArrow
 						}

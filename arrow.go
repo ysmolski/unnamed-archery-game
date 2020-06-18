@@ -102,7 +102,7 @@ func (a *Arrow) Fly(from, to, relational pixel.Vec) {
 }
 
 func (a *Arrow) Kills(col pixel.Rect) bool {
-	return a.State == ArrowFlying && a.CanKill() && Collides(col, a.AbsCollider())
+	return a.State == ArrowFlying && a.CanKill() && collides(col, a.AbsCollider())
 }
 
 func (a *Arrow) Stick() {
@@ -140,7 +140,7 @@ func (a *Arrow) Update() {
 	acol := a.AbsCollider()
 	walls := world.GetColliders(acol)
 	for _, wall := range walls {
-		if Collides(acol, wall) {
+		if collides(acol, wall) {
 			// a.Active = false
 			// a.Visible = false
 			a.State = ArrowStuck
